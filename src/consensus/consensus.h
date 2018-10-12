@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2018 The Bitcoin SV developers
+// Copyright (c) 2018 The Asynx developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -18,7 +19,7 @@ static const uint64_t MAX_TX_SIZE = ONE_MEGABYTE;
 /** The maximum allowed size for a block, before the UAHF */
 static const uint64_t LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE;
 /** Default setting for maximum allowed size for a block, in bytes */
-static const uint64_t DEFAULT_MAX_BLOCK_SIZE = 128 * ONE_MEGABYTE;
+static const uint64_t DEFAULT_MAX_BLOCK_SIZE = 2097152 * ONE_MEGABYTE;
 /** Pre Nov 2018 default setting for maximum allowed size for a block, in bytes */
 static const uint64_t LEGACY_DEFAULT_MAX_BLOCK_SIZE = 32 * ONE_MEGABYTE;
 /**
