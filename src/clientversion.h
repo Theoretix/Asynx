@@ -1,4 +1,5 @@
 // Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2018 The Asynx developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -56,13 +57,13 @@
 
 /**
  * Initial bitcoin has its own way of calculating the client version number
- * i.e CLIENT_VERSION. Bitcoin SV start at a very low version numbers.
+ * i.e CLIENT_VERSION. Asynx starts at a very low version number.
  * In order to keep backward compatibility, the calculated CLIENT_VERSION
- * is shifted in the way the lowest version of Bitcoin SV is still higher 
- * than the highest calculated version in the traditional Bitcoin.
+ * is shifted in the way the lowest version of Asynx is still higher 
+ * than the highest calculated version of traditional Bitcoin implementations.
  */
-const int _SV_VERSION_SHIFT = 100000000;
-static const int CLIENT_VERSION = _SV_VERSION_SHIFT +
+const int _ASYNX_VERSION_SHIFT = 100000000;
+static const int CLIENT_VERSION = _ASYNX_VERSION_SHIFT +
     1000000 * CLIENT_VERSION_MAJOR + 10000 * CLIENT_VERSION_MINOR +
     100 * CLIENT_VERSION_REVISION + 1 * CLIENT_VERSION_BUILD;
 
