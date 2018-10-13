@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
 # Copyright (c) 2017 The Bitcoin developers
+# Copyright (c) 2018 The Asynx developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Run regression test suite.
@@ -533,7 +534,7 @@ def save_results_as_junit(test_results, file_name, time):
     See http://llg.cubic.org/docs/junit/ for specification of format
     """
     e_test_suite = ET.Element("testsuite",
-                              {"name": "bitcoin_sv_tests",
+                              {"name": "asynx_tests",
                                "tests": str(len(test_results)),
                                #"errors":
                                "failures": str(len([t for t in test_results if t.status == "Failed"])),

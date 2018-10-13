@@ -6,7 +6,7 @@ SDK_PATH ?= $(BASEDIR)/SDKs
 NO_QT ?= true
 NO_WALLET ?=
 NO_UPNP ?=
-FALLBACK_DOWNLOAD_PATH ?= https://bitcoinsv.io/depends-sources
+FALLBACK_DOWNLOAD_PATH ?= https://asynx.io/depends/
 
 BUILD = $(shell ./config.guess)
 HOST ?= $(BUILD)

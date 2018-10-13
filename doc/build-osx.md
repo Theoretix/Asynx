@@ -29,15 +29,15 @@ In case you want to build the disk image with `make deploy` (.dmg / optional), y
 
     brew install librsvg
 
-Build Bitcoin SV
+Build Asynx
 -----------------
 
-1. Clone the Bitcoin SV source code and cd into `bitcoin-sv`
+1. Clone the Asynx source code and cd into `asynx`
 
-        git clone github.com/bitcoin-sv/bitcoin-sv
-        cd bitcoin-sv
+        git clone github.com/Theoretix/Asynx
+        cd asynx
 
-2.  Build bitcoin-sv:
+2.  Build asynx:
 
     Configure and build the headless bitcoin binaries as well as the GUI (if Qt is found).
 

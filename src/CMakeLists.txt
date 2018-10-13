@@ -1,7 +1,7 @@
-# Copyright (c) 2017 The Bitcoin developers
+# Copyright (c) 2018 The Asynx developers
 
 cmake_minimum_required(VERSION 3.5)
-project(BitcoinSV)
+project(Asynx)
 
 set(CMAKE_CXX_STANDARD 11)
 

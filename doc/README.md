@@ -1,15 +1,15 @@
-Bitcoin SV
+Asynx
 =====================
 
 Setup
 ---------------------
-Bitcoin SV is an implementation of a node for the Bitcoin Cash network and 
+Asynx is an implementation of a node for the Bitcoin Cash network and 
 builds the backbone of the network. It downloads and stores the entire history of 
 Bitcoin transactions (which is currently several GBs); depending on the speed of 
 your computer and network connection, the synchronization process can take anywhere 
 from a few hours to a day or more.
 
-To download Bitcoin SV, visit [bitcoinsv.io](https://bitcoinsv.io/).
+To download Asynx, visit [asynx.io](https://asynx.io/).
 
 Running
 ---------------------
@@ -28,13 +28,13 @@ Unpack the files into a directory, and then run bitcoin-qt.exe.
 
 ### OS X
 
-Drag bitcoin-sv to your applications folder, and then run bitcoin-sv.
+Drag asynx to your applications folder, and then run asynx.
 
 ### Need Help?
 
 * See the documentation at the [Bitcoin Wiki](https://en.bitcoin.it/wiki/Main_Page)
 for help and more information.
-* Ask for help on the [Bitcoin SV Subreddit](https://www.reddit.com/r/BitcoinSV/).
+* Ask for help on the [Asynx Subreddit](https://www.reddit.com/r/Asynx/).
 
 Building
 ---------------------
@@ -48,7 +48,7 @@ The following are developer notes on how to build Bitcoin on your native platfor
 
 Development
 ---------------------
-The Bitcoin SV repo's [root README](/README.md) contains relevant information on the development process and automated testing.
+The Asynx repo's [root README](/README.md) contains relevant information on the development process and automated testing.
 
 - [Developer Notes](developer-notes.md)
 - [Release Notes](release-notes.md)

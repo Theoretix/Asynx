@@ -1,5 +1,5 @@
 ---
-name: "bitcoin-sv-0.17-win"
+name: "asynx-0.1.0-win"
 enable_cache: true
 suites:
 - "xenial"
@@ -31,7 +31,7 @@ alternatives:
 - "package" : "x86_64-w64-mingw32-g++"
   "path" : "/usr/bin/x86_64-w64-mingw32-g++-posix"
 remotes:
-- "url": "https://github.com/bitcoin-sv/bitcoin-sv.git"
+- "url": "https://github.com/Theoretix/Asynx.git"
   "dir": "bitcoin"
 files: []
 script: |
@@ -135,7 +135,7 @@ script: |
   mkdir -p temp
   pushd temp
   tar xf ../$SOURCEDIST
-  find bitcoin-sv-* | sort | tar --no-recursion --mode='u+rw,go+r-w,a+X' --owner=0 --group=0 -c -T - | gzip -9n > ../$SOURCEDIST
+  find asynx-* | sort | tar --no-recursion --mode='u+rw,go+r-w,a+X' --owner=0 --group=0 -c -T - | gzip -9n > ../$SOURCEDIST
   mkdir -p $OUTDIR/src
   cp ../$SOURCEDIST $OUTDIR/src
   popd
@@ -155,7 +155,7 @@ script: |
     make ${MAKEOPTS} -C src check-security
     make deploy
     make install DESTDIR=${INSTALLPATH}
-    cp -f bitcoin-sv-*setup*.exe $OUTDIR/
+    cp -f asynx-*setup*.exe $OUTDIR/
     cd installed
     mv ${DISTNAME}/bin/*.dll ${DISTNAME}/lib/
     find . -name "lib*.la" -delete

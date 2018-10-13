@@ -1,5 +1,5 @@
 ---
-name: "bitcoin-sv-0.17-linux"
+name: "asynx-0.1.0-linux"
 enable_cache: true
 suites:
 - "xenial"
@@ -35,7 +35,7 @@ packages:
 - "libc6-dev:i386"
 - "libstdc++6:i386"
 remotes:
-- "url": "https://github.com/bitcoin-sv/bitcoin-sv.git"
+- "url": "https://github.com/Theoretix/Asynx.git"
   "dir": "bitcoin"
 files: []
 script: |
@@ -142,13 +142,13 @@ script: |
   ./autogen.sh
   CONFIG_SITE=${BASEPREFIX}/`echo "${HOSTS}" | awk '{print $1;}'`/share/config.site ./configure --prefix=/
   make dist
-  SOURCEDIST=`echo bitcoin-sv-*.tar.gz`
+  SOURCEDIST=`echo asynx-*.tar.gz`
   DISTNAME=`echo ${SOURCEDIST} | sed 's/.tar.*//'`
   # Correct tar file order
   mkdir -p temp
   pushd temp
   tar xf ../$SOURCEDIST
-  find bitcoin-sv-* | sort | tar --no-recursion --mode='u+rw,go+r-w,a+X' --owner=0 --group=0 -c -T - | gzip -9n > ../$SOURCEDIST
+  find asynx-* | sort | tar --no-recursion --mode='u+rw,go+r-w,a+X' --owner=0 --group=0 -c -T - | gzip -9n > ../$SOURCEDIST
   popd
 
   ORIGPATH="$PATH"

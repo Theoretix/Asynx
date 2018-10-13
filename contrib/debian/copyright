@@ -1,7 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: Bitcoin SV
-Upstream-Contact: contact@bitcoinsv.io
-Source: https://github.com/bitcoin-sv/bitcoin-sv
+Upstream-Name: Asynx
+Upstream-Contact: admin@asynx.io
+Source: https://github.com/Theoretix/Asynx
 
 Files: *
 Copyright: 2009-2017, Bitcoin Core Developers, 2017 Bitcoin Developers
