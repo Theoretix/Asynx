@@ -1,4 +1,4 @@
-Bitcoin SV
+Asynx
 ===========
 
 This is a Beta release, the purpose of which is to provide a preview of the code in response to requests from 
@@ -16,33 +16,31 @@ the version supported by Bitcoin Core when the two split on August 1, 2017.
 Bitcoin Cash and the Bitcoin Core version of Bitcoin share the same
 transaction history up until the split.
 
-What is Bitcoin SV?
+What is Asynx?
 --------------------
 
-Bitcoin Satoshi Vision (SV) is the name of open-source software which enables the use of
-Bitcoin Cash. 
+Asynx is the name of open-source software which enables the use of Bitcoin Cash. 
 
-The source code was originally based on the [Bitcoin ABC](https://bitcoinabc.org)
+The source code was originally based on the [Bitcoin SV](https://bitcoinsv.io)
 software project.
 
 License
 -------
 
-Bitcoin SV is released under the terms of the MIT license. See
+Asynx is released under the terms of the MIT license. See
 [COPYING](COPYING) for more information or see
 https://opensource.org/licenses/MIT.
 
 Security
 --------
-The Bitcoin SV team are currently organizing a Responsible Disclosure Policy.
+The Asynx team are currently organizing a Responsible Disclosure Policy.
 We expect to have this ready soon. In the meantime, if you have important 
-information to share, please contact Daniel Connolly (d.connolly@nchain.com)
-or Steve Shadders (s.shadders@nchain.com).
+information to share, please contact Dr. Roy Murphy (admin@asynx.io).
 
 Development Process
 -------------------
 
 This Github repository only contains the source code of releases.
 
-At this early stage in Bitcoin SV's development, we are not accepting contributions
+At this early stage in Asynx's development, we are not accepting contributions
 to the project. We expect this to change in the future.
