@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2017 The Bitcoin developers
+# Copyright (c) 2018 The Asynx developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """
@@ -48,7 +48,7 @@ class ABC_CmdLine_Test (BitcoinTestFramework):
         #                    (2 * DEFAULT_MAX_BLOCK_SIZE)])
         #self.check_excessive(2 * DEFAULT_MAX_BLOCK_SIZE)
         ## Check for EB correctness in the subver string
-        #self.check_subversion("/Bitcoin SV:.*\(EB64\.0; .*\)/")
+        #self.check_subversion("/Asynx:.*\(EB64\.0; .*\)/")
 
         excessive = 2 * LEGACY_DEFAULT_MAX_BLOCK_SIZE;
         self.log.info("  Set to twice the legacy default, i.e. %d bytes" % excessive)

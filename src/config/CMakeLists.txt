@@ -1,4 +1,4 @@
-# Copyright (c) 2017 The Bitcoin developers
+# Copyright (c) 2018 The Asynx developers
 
 # This generates config.h which provides numerous defines
 # about the state of the plateform we are building on.
@@ -7,7 +7,7 @@ include(CheckIncludeFiles)
 include(CheckSymbolExists)
 
 # Package informations
-set(PACKAGE_NAME "Bitcoin SV")
+set(PACKAGE_NAME "Asynx")
 
 # Version
 set(CLIENT_VERSION_MAJOR 0)

@@ -195,7 +195,7 @@ BOOST_AUTO_TEST_CASE(test_userAgentLength) {
 
     BOOST_CHECK_EQUAL(userAgent(config).size(), MAX_SUBVERSION_LENGTH);
     BOOST_CHECK_EQUAL(userAgent(config),
-                      "/Bitcoin SV:0.1.0(EB8.0; very very very very very "
+                      "/Asynx:0.1.0(EB8.0; very very very very very "
                       "very very very very very very very very very very very "
                       "very very very very very very very very very very very "
                       "very very very very very very very very very very very "
