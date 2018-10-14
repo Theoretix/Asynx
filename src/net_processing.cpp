@@ -1,10 +1,10 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2018 The Asynx developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "net_processing.h"
-
 #include "addrman.h"
 #include "arith_uint256.h"
 #include "blockencodings.h"
@@ -3501,7 +3501,8 @@ bool SendMessages(const Config &config, CNode *pto, CConnman &connman,
     {
         LOCK(pto->cs_inventory);
         vInv.reserve(std::max<size_t>(pto->vInventoryBlockToSend.size(),
-                                      INVENTORY_BROADCAST_MAX));
+        	INVENTORY_BROADCAST_MAX_PER_MB *
+            config.GetMaxBlockSize() / 1000000));
 
         // Add blocks
         for (const uint256 &hash : pto->vInventoryBlockToSend) {
@@ -3595,7 +3596,9 @@ bool SendMessages(const Config &config, CNode *pto, CConnman &connman,
             unsigned int nRelayedTransactions = 0;
             LOCK(pto->cs_filter);
             while (!vInvTx.empty() &&
-                   nRelayedTransactions < INVENTORY_BROADCAST_MAX) {
+                   nRelayedTransactions < INVENTORY_BROADCAST_MAX_PER_MB *
+                                              config.GetMaxBlockSize() /
+                                              1000000) {
                 // Fetch the top element from the heap
                 std::pop_heap(vInvTx.begin(), vInvTx.end(),
                               compareInvMempoolOrder);
