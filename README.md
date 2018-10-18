@@ -1,8 +1,7 @@
 Asynx
 ===========
 
-This is a Beta release, the purpose of which is to provide a preview of the code in response to requests from 
-miners and pool operators. This release will undergo extensive testing and security audit before the final release in October.
+Asynx is an asynchronous, non-deterministic, multithreaded implementation of Bitcoin Cash client software.
 
 What is Bitcoin Cash?
 ---------------------
