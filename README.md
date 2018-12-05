@@ -1,27 +1,25 @@
 Asynx
 ===========
 
-Asynx is an asynchronous, non-deterministic, multithreaded implementation of Bitcoin Cash client software.
+Asynx is an asynchronous, non-deterministic, multithreaded implementation of Bitcoin SV client software.
 
-What is Bitcoin Cash?
+What is Bitcoin SV?
 ---------------------
 
-[Bitcoin Cash](https://www.bitcoincash.org/) is an experimental digital
+[Bitcoin SV](https://bitcoinsv.io/) is the original Bitcoin. It is a
 currency that enables instant payments to anyone, anywhere in the world. It
 uses peer-to-peer technology to operate with no central authority: managing
 transactions and issuing money are carried out collectively by the network.
-Bitcoin Cash is a descendant of Bitcoin. It became a separate currency from
-the version supported by Bitcoin Core when the two split on August 1, 2017.
-Bitcoin Cash and the Bitcoin Core version of Bitcoin share the same
-transaction history up until the split.
+Bitcoin SV (Satoshi Vision) restores the original protocol and economic
+system, allowing it to remain safely stable whilst enabling massive scaling.
 
 What is Asynx?
 --------------------
 
-Asynx is the name of open-source software which enables the use of Bitcoin Cash. 
+Asynx is the name of open-source software which enables the use of Bitcoin SV. 
 
 The source code was originally based on the [Bitcoin SV](https://bitcoinsv.io)
-software project.
+v0.1.0 alpha software project and is parallel developed to enable massive scaling.
 
 License
 -------
