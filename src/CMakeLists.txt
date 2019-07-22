@@ -1,20 +1,28 @@
-# Copyright (c) 2018 The Asynx developers
+# Copyright (c) 2017 The Bitcoin developers
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 cmake_minimum_required(VERSION 3.5)
-project(Asynx)
+project(BitcoinSV)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 # Default visibility is hidden on all targets.
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+option(ENABLE_PROD_BUILD "Enable production build" OFF)
 option(BUILD_BITCOIN_WALLET "Activate the wallet functionality" ON)
 option(BUILD_BITCOIN_ZMQ "Activate the ZeroMQ functionalities" ON)
-option(BUILD_BITCOIN_SEEDER "Build bitcoin-seeder" ON)
+
+if (NOT MSVC)
+  #bitcoin seeder can not be build with MSVC
+	option(BUILD_BITCOIN_SEEDER "Build bitcoin-seeder" ON)
+endif()
+
 option(BUILD_BITCOIN_CLI "Build bitcoin-cli" ON)
 option(BUILD_BITCOIN_TX "Build bitcoin-tx" ON)
-option(BUILD_BITCOIN_QT "Build bitcoin-qt" ON)
+option(BUILD_BITCOIN_BENCH "Build benchmarks" ON)
 
 # Ensure that WINDRES_PREPROC is enabled when using windres.
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
@@ -41,6 +49,33 @@ if(EXTRA_WARNINGS)
 	add_cxx_compiler_flag(-Wsuggest-override)
 else()
 	add_compiler_flag(-Wno-unused-parameter)
+endif()
+
+if(MSVC)
+	# Do not define min/max macros - we use std::min/max
+	add_compile_definitions(NOMINMAX)
+	# Perform parallel builds:
+	add_compile_options("/MP")
+
+	# Fix Cmake's default compiler options - see also https://gitlab.kitware.com/cmake/community/wikis/FAQ#dynamic-replace
+	# - remove default NDEBUG compile definition to solve #error "Bitcoin cannot be compiled without assertions"
+	# - use static runtime instead of dynamic runtime to match the external libraries  
+	foreach(flag_var
+		CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+		CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO
+		CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+		CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
+		
+	if(${flag_var} MATCHES "/MD")
+			string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")    
+		endif()
+
+		if(${flag_var} MATCHES "/DNDEBUG")
+			string(REGEX REPLACE "/DNDEBUG" "" ${flag_var} "${${flag_var}}")
+		endif()
+
+	endforeach()
+
 endif()
 
 # libtool style configure
@@ -80,6 +115,9 @@ add_library(util
 	utiltime.cpp
 )
 
+if(ENABLE_PROD_BUILD)
+    target_compile_definitions(util PUBLIC IS_PRODUCTION_BUILD)
+endif()
 target_compile_definitions(util PUBLIC HAVE_CONFIG_H)
 target_include_directories(util
 	PUBLIC
@@ -129,8 +167,6 @@ target_compile_definitions(util PUBLIC BOOST_SP_USE_STD_ATOMIC BOOST_AC_USE_STD_
 add_library(common
 	amount.cpp
 	base58.cpp
-	cashaddr.cpp
-	cashaddrenc.cpp
 	chainparams.cpp
 	config.cpp
 	consensus/merkle.cpp
@@ -175,6 +211,7 @@ add_library(server
 	addrdb.cpp
 	bloom.cpp
 	blockencodings.cpp
+	blockfileinfostore.cpp
 	chain.cpp
 	checkpoints.cpp
 	config.cpp
@@ -183,7 +220,9 @@ add_library(server
 	init.cpp
 	dbwrapper.cpp
 	merkleblock.cpp
-	miner.cpp
+	mining/candidates.cpp
+	mining/factory.cpp
+    mining/legacy.cpp
 	net.cpp
 	net_processing.cpp
 	noui.cpp
@@ -194,6 +233,7 @@ add_library(server
 	rpc/abc.cpp
 	rpc/blockchain.cpp
 	rpc/mining.cpp
+	rpc/mining-fbb.cpp
 	rpc/misc.cpp
 	rpc/net.cpp
 	rpc/rawtransaction.cpp
@@ -205,10 +245,12 @@ add_library(server
 	torcontrol.cpp
 	txdb.cpp
 	txmempool.cpp
+	txn_propagator.cpp
 	ui_interface.cpp
 	validation.cpp
 	validationinterface.cpp
 	versionbits.cpp
+    vmtouch.cpp
 )
 
 # This require libevent
@@ -229,10 +271,19 @@ target_link_libraries(server
 
 if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_link_libraries(server ${EVENT_PTHREAD_LIBRARY})
+else()
+  # New mining API uses boost uuid library which requires bcrypt.lib on Windows
+  find_library(BCRYPT_LIBRARY NAMES bcrypt)
+  target_link_libraries(server ${BCRYPT_LIBRARY})
 endif()
 
 # Test suite.
 add_subdirectory(test)
+
+# Benchmark suite
+if(BUILD_BITCOIN_BENCH)
+	add_subdirectory(bench)
+endif()
 
 # Wallet
 if(BUILD_BITCOIN_WALLET)
@@ -281,9 +332,4 @@ add_executable(bitcoind bitcoind.cpp)
 target_link_libraries(bitcoind server)
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_sources(bitcoind PRIVATE bitcoind-res.rc)
-endif()
-
-# Bitcoin-qt
-if(BUILD_BITCOIN_QT)
-	add_subdirectory(qt)
 endif()

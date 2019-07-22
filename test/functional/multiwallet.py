@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2017 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Test multiwallet.
 
 Verify that a bitcoind node can load multiple wallet files
@@ -32,13 +32,17 @@ class MultiWalletTest(BitcoinTestFramework):
         self.assert_start_raises_init_error(
             0, ['-wallet=w11'], 'Error loading wallet w11. -wallet filename must be a regular file.')
 
-        # should not initialize if wallet file is a symlink
-        wallet_dir = os.path.abspath(os.path.join(
-            self.options.tmpdir, 'node0', 'regtest'))
-        os.symlink(os.path.join(wallet_dir, 'w1'),
-                   os.path.join(wallet_dir, 'w12'))
-        self.assert_start_raises_init_error(
-            0, ['-wallet=w12'], 'Error loading wallet w12. -wallet filename must be a regular file.')
+        # should not initialize if wallet file is a symlink (do not test on windows where symlinks are not supported by python)
+        # On Windows SeCreateSymbolicLinkPrivilege  is usually not held unless user is admin and has used 
+        # escalation. Skip the symlink link test there
+
+        if (os.name != 'nt'):
+            wallet_dir = os.path.abspath(os.path.join(
+                self.options.tmpdir, 'node0', 'regtest'))
+            os.symlink(os.path.join(wallet_dir, 'w1'),
+                       os.path.join(wallet_dir, 'w12'))
+            self.assert_start_raises_init_error(
+                0, ['-wallet=w12'], 'Error loading wallet w12. -wallet filename must be a regular file.')
 
         self.start_node(0, self.extra_args[0])
 

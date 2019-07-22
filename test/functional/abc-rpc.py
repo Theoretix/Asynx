@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# Copyright (c) 2018 The Asynx developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2017 The Bitcoin developers
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-# Exercise the Asynx RPC calls.
+# Exercise the Bitcoin SV RPC calls.
 
 import time
 import random
@@ -12,7 +12,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (assert_equal, assert_raises_rpc_error)
 from test_framework.cdefs import (ONE_MEGABYTE,
                                   LEGACY_MAX_BLOCK_SIZE,
-                                  DEFAULT_MAX_BLOCK_SIZE)
+                                  REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER)
 
 
 class ABC_RPC_Test (BitcoinTestFramework):
@@ -32,10 +32,10 @@ class ABC_RPC_Test (BitcoinTestFramework):
         assert(pattern.match(subversion))
 
     def test_excessiveblock(self):
-        # Check that we start with DEFAULT_MAX_BLOCK_SIZE
+        # Check that we start with REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER
         getsize = self.nodes[0].getexcessiveblock()
         ebs = getsize['excessiveBlockSize']
-        assert_equal(ebs, DEFAULT_MAX_BLOCK_SIZE)
+        assert_equal(ebs, REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER)
 
         # Check that setting to legacy size is ok
         self.nodes[0].setexcessiveblock(LEGACY_MAX_BLOCK_SIZE + 1)
@@ -56,7 +56,7 @@ class ABC_RPC_Test (BitcoinTestFramework):
         ebs = getsize['excessiveBlockSize']
         assert_equal(ebs, 2 * ONE_MEGABYTE)
         # Check for EB correctness in the subver string
-        self.check_subversion("/Asynx:.*\(EB2\.0; .*\)/")
+        self.check_subversion("/Bitcoin SV:.*\(EB2\.0; .*\)/")
 
         # Check setting to 13MB
         self.nodes[0].setexcessiveblock(13 * ONE_MEGABYTE)
@@ -64,7 +64,7 @@ class ABC_RPC_Test (BitcoinTestFramework):
         ebs = getsize['excessiveBlockSize']
         assert_equal(ebs, 13 * ONE_MEGABYTE)
         # Check for EB correctness in the subver string
-        self.check_subversion("/Asynx:.*\(EB13\.0; .*\)/")
+        self.check_subversion("/Bitcoin SV:.*\(EB13\.0; .*\)/")
 
         # Check setting to 13.14MB
         self.nodes[0].setexcessiveblock(13140000)
@@ -72,7 +72,7 @@ class ABC_RPC_Test (BitcoinTestFramework):
         ebs = getsize['excessiveBlockSize']
         assert_equal(ebs, 13.14 * ONE_MEGABYTE)
         # check for EB correctness in the subver string
-        self.check_subversion("/Asynx:.*\(EB13\.1; .*\)/")
+        self.check_subversion("/Bitcoin SV:.*\(EB13\.1; .*\)/")
 
     def run_test(self):
         self.genesis_hash = int(self.nodes[0].getbestblockhash(), 16)

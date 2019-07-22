@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
@@ -70,10 +70,6 @@
 
 #ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
-#endif
-
-#ifdef HAVE_MALLOPT_ARENA_MAX
-#include <malloc.h>
 #endif
 
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
@@ -212,9 +208,25 @@ std::string ArgsManager::GetArg(const std::string &strArg,
 
 int64_t ArgsManager::GetArg(const std::string &strArg, int64_t nDefault) {
     LOCK(cs_args);
-    if (mapArgs.count(strArg)) return atoi64(mapArgs[strArg]);
-    return nDefault;
+    int64_t returnValue(nDefault);
+	if (mapArgs.count(strArg)) 
+    {
+        const std::string& argValue (mapArgs[strArg]);
+        if ( argValue.find_first_not_of ( "\t\r\n\f ") != std::string::npos)
+        {
+            try
+            {   
+                returnValue = stoll(argValue);
+            }
+            catch (std::exception& e)
+            {   
+                PrintExceptionContinue(&e, "ArgsManager::GetArg" );
+            }
+        }
+    }
+    return returnValue;
 }
+
 
 bool ArgsManager::GetBoolArg(const std::string &strArg, bool fDefault) {
     LOCK(cs_args);
@@ -319,7 +331,7 @@ fs::path GetDefaultDataDir() {
         pathRet = fs::path("/");
     else
         pathRet = fs::path(pszHome);
-#ifdef MAC_OSX
+#ifdef __APPLE__
     // Mac
     return pathRet / "Library/Application Support/Bitcoin";
 #else
@@ -513,7 +525,7 @@ void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length) {
     nFileSize.u.HighPart = nEndPos >> 32;
     SetFilePointerEx(hFile, nFileSize, 0, FILE_BEGIN);
     SetEndOfFile(hFile);
-#elif defined(MAC_OSX)
+#elif defined(__APPLE__)
     // OSX specific version.
     fstore_t fst;
     fst.fst_flags = F_ALLOCATECONTIG;
@@ -573,7 +585,7 @@ void RenameThread(const char *name) {
 #elif (defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
     pthread_set_name_np(pthread_self(), name);
 
-#elif defined(MAC_OSX)
+#elif defined(__APPLE__)
     pthread_setname_np(name);
 #else
     // Prevent warnings for unused parameters...
@@ -582,19 +594,9 @@ void RenameThread(const char *name) {
 }
 
 void SetupEnvironment() {
-#ifdef HAVE_MALLOPT_ARENA_MAX
-    // glibc-specific: On 32-bit systems set the number of arenas to 1. By
-    // default, since glibc 2.10, the C library will create up to two heap
-    // arenas per core. This is known to cause excessive virtual address space
-    // usage in our usage. Work around it by setting the maximum number of
-    // arenas to 1.
-    if (sizeof(void *) == 4) {
-        mallopt(M_ARENA_MAX, 1);
-    }
-#endif
 // On most POSIX systems (e.g. Linux, but not BSD) the environment's locale may
 // be invalid, in which case the "C" locale is used as fallback.
-#if !defined(WIN32) && !defined(MAC_OSX) && !defined(__FreeBSD__) &&           \
+#if !defined(WIN32) && !defined(__APPLE__) && !defined(__FreeBSD__) &&           \
     !defined(__OpenBSD__)
     try {
         // Raises a runtime error if current locale is invalid.

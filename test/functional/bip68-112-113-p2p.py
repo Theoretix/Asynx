@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2015-2016 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Test activation of the first version bits soft fork.
 
 This soft fork will activate the following BIPS:
@@ -100,10 +100,7 @@ class BIP68_112_113Test(ComparisonTestFramework):
         self.extra_args = [['-whitelist=127.0.0.1', '-blockversion=4']]
 
     def run_test(self):
-        test = TestManager(self, self.options.tmpdir)
-        test.add_all_connections(self.nodes)
-        NetworkThread().start()  # Start up network handling in another thread
-        test.run()
+        self.test.run()
 
     def send_generic_input_tx(self, node, coinbases):
         amount = Decimal("49.99")

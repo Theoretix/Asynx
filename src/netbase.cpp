@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifdef HAVE_CONFIG_H
 #include "config/bitcoin-config.h"
@@ -95,12 +95,12 @@ static bool LookupIntern(const char *pszName, std::vector<CNetAddr> &vIP,
         if (aiTrav->ai_family == AF_INET) {
             assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in));
             vIP.push_back(
-                CNetAddr(((struct sockaddr_in *)(aiTrav->ai_addr))->sin_addr));
+                CNetAddr(reinterpret_cast<sockaddr_in *>(aiTrav->ai_addr)->sin_addr));
         }
 
         if (aiTrav->ai_family == AF_INET6) {
             assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in6));
-            struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)aiTrav->ai_addr;
+            struct sockaddr_in6 *s6 = reinterpret_cast<sockaddr_in6 *>(aiTrav->ai_addr);
             vIP.push_back(CNetAddr(s6->sin6_addr, s6->sin6_scope_id));
         }
 

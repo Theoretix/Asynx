@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, false));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state));
     }
 
     // Get just before the limit.
@@ -207,7 +207,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, false));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state));
     }
 
     // And go over.
@@ -215,7 +215,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
 
     {
         CValidationState state;
-        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, false));
+        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txn-sigops");
     }
 }

@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "rpc/mining.h"
 #include "amount.h"
@@ -14,7 +14,7 @@
 #include "core_io.h"
 #include "dstencode.h"
 #include "init.h"
-#include "miner.h"
+#include "mining/factory.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "pow.h"
@@ -128,21 +128,18 @@ UniValue generateBlocks(const Config &config,
 
     unsigned int nExtraNonce = 0;
     UniValue blockHashes(UniValue::VARR);
+    CBlockIndex* pindexPrev {nullptr};
     while (nHeight < nHeightEnd) {
         std::unique_ptr<CBlockTemplate> pblocktemplate(
-            BlockAssembler(config).CreateNewBlock(
-                coinbaseScript->reserveScript));
+            CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScript->reserveScript, pindexPrev));
 
         if (!pblocktemplate.get()) {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         }
 
-        CBlock *pblock = &pblocktemplate->block;
-
-        {
-            LOCK(cs_main);
-            IncrementExtraNonce(config, pblock, chainActive.Tip(), nExtraNonce);
-        }
+        CBlockRef blockRef = pblocktemplate->GetBlockRef();
+        CBlock *pblock = blockRef.get();
+        IncrementExtraNonce(config, pblock, pindexPrev, nExtraNonce);
 
         while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount &&
                !CheckProofOfWork(pblock->GetHash(), pblock->nBits, config)) {
@@ -262,7 +259,7 @@ static UniValue getmininginfo(const Config &config,
     return obj;
 }
 
-// NOTE: Unlike wallet RPC (which use BCH values), mining RPCs follow GBT (BIP
+// NOTE: Unlike wallet RPC (which use BSV values), mining RPCs follow GBT (BIP
 // 22) in using satoshi amounts
 static UniValue prioritisetransaction(const Config &config,
                                       const JSONRPCRequest &request) {
@@ -549,9 +546,10 @@ static UniValue getblocktemplate(const Config &config,
             "Error: Peer-to-peer functionality missing or disabled");
     }
 
-    if (g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0) {
-        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED,
-                           "Bitcoin is not connected!");
+    // "-standalone" is an undocumented option.
+    if ((g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0) && !gArgs.IsArgSet("-standalone"))
+    {
+        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Bitcoin is not connected!");
     }
 
     if (IsInitialBlockDownload()) {
@@ -620,24 +618,21 @@ static UniValue getblocktemplate(const Config &config,
         // failures from here on
         pindexPrev = nullptr;
 
-        // Store the pindexBest used before CreateNewBlock, to avoid races
+        // Update other fields for tracking state of this candidate
         nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
-        CBlockIndex *pindexPrevNew = chainActive.Tip();
         nStart = GetTime();
 
         // Create new block
         CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptDummy);
+        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptDummy, pindexPrev);
         if (!pblocktemplate) {
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
         }
-
-        // Need to update only after we know CreateNewBlock succeeded
-        pindexPrev = pindexPrevNew;
     }
 
     // pointer for convenience
-    CBlock *pblock = &pblocktemplate->block;
+    CBlockRef blockRef = pblocktemplate->GetBlockRef();
+    CBlock *pblock = blockRef.get();
     const Consensus::Params &consensusParams =
         config.GetChainParams().GetConsensus();
 
@@ -781,10 +776,12 @@ static UniValue getblocktemplate(const Config &config,
         Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1));
     result.push_back(Pair("mutable", aMutable));
     result.push_back(Pair("noncerange", "00000000ffffffff"));
+
+    auto defaultmaxBlockSize = config.GetChainParams().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter;
     // FIXME: Allow for mining block greater than 1M.
     result.push_back(
-        Pair("sigoplimit", GetMaxBlockSigOpsCount(DEFAULT_MAX_BLOCK_SIZE)));
-    result.push_back(Pair("sizelimit", DEFAULT_MAX_BLOCK_SIZE));
+        Pair("sigoplimit", GetMaxBlockSigOpsCount(defaultmaxBlockSize)));
+    result.push_back(Pair("sizelimit", defaultmaxBlockSize));
     result.push_back(Pair("curtime", pblock->GetBlockTime()));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight + 1)));
@@ -844,6 +841,12 @@ static UniValue submitblock(const Config &config,
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
     }
 
+    return SubmitBlock(config, blockptr);
+}
+
+UniValue SubmitBlock(const Config& config, const std::shared_ptr<CBlock>& blockptr)
+{
+    CBlock &block = *blockptr;
     if (block.vtx.empty() || !block.vtx[0]->IsCoinBase()) {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
                            "Block does not start with a coinbase");

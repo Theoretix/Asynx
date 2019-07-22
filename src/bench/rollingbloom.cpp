@@ -1,12 +1,11 @@
 // Copyright (c) 2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include <iostream>
 
 #include "bench.h"
 #include "bloom.h"
-#include "utiltime.h"
 
 static void RollingBloom(benchmark::State &state) {
     CRollingBloomFilter filter(120000, 0.000001);
@@ -22,12 +21,10 @@ static void RollingBloom(benchmark::State &state) {
         data[2] = count >> 16;
         data[3] = count >> 24;
         if (countnow == nEntriesPerGeneration) {
-            int64_t b = GetTimeMicros();
+            auto b = benchmark::clock::now();
             filter.insert(data);
-            int64_t e = GetTimeMicros();
-            std::cout << "RollingBloom-refresh,1," << (e - b) * 0.000001 << ","
-                      << (e - b) * 0.000001 << "," << (e - b) * 0.000001
-                      << "\n";
+            auto total = std::chrono::duration_cast<std::chrono::nanoseconds>(benchmark::clock::now() - b).count();
+            std::cout << "RollingBloom-refresh,1," << total << "," << total << "," << total << "\n";
             countnow = 0;
         } else {
             filter.insert(data);

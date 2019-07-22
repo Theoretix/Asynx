@@ -6,7 +6,7 @@ etc.
 There are currently two sets of tests in this directory:
 
 - [functional](/test/functional) which test the functionality of 
-bitcoind and bitcoin-qt by interacting with them through the RPC and P2P
+bitcoind by interacting with them through the RPC and P2P
 interfaces.
 - [util](test/util) which tests the bitcoin utilities, currently only
 bitcoin-tx.
@@ -66,6 +66,12 @@ how many jobs to run, append `--jobs=n`
 The individual tests and the test_runner harness have many command-line
 options. Run `test_runner.py -h` to see them all.
 
+Multiple build configurations are supported on Windows. Use `--buildconfig` parameter to specify which one you want to test.
+
+```
+test/functional/test_runner.py --buildconfig RelWithDebInfo
+```
+
 #### Troubleshooting and debugging test failures
 
 ##### Resource contention
@@ -119,13 +125,13 @@ default:
 - when run directly, *all* logs are written to `test_framework.log` and INFO
   level and above are output to the console.
 - when run on Travis, no logs are output to the console. However, if a test
-  fails, the `test_framework.log` and bitcoind `debug.log`s will all be dumped
+  fails, the `test_framework.log` and bitcoind `bitcoind.log`s will all be dumped
   to the console to help troubleshooting.
 
 To change the level of logs output to the console, use the `-l` command line
 argument.
 
-`test_framework.log` and bitcoind `debug.log`s can be combined into a single
+`test_framework.log` and bitcoind `bitcoind.log`s can be combined into a single
 aggregate log by running the `combine_logs.py` script. The output can be plain
 text, colorized text or html. For example:
 

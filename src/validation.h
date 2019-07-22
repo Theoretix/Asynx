@@ -1,10 +1,8 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2017 The Bitcoin developers
-// Copyright (c) 2018 The Bitcoin SV developers
-// Copyright (c) 2018 The Asynx developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2018-2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_VALIDATION_H
 #define BITCOIN_VALIDATION_H
@@ -57,6 +55,8 @@ struct LockPoints;
 static const bool DEFAULT_WHITELISTRELAY = true;
 /** Default for DEFAULT_WHITELISTFORCERELAY. */
 static const bool DEFAULT_WHITELISTFORCERELAY = true;
+/** Default for DEFAULT_REJECTMEMPOOLREQUEST. */
+static const bool DEFAULT_REJECTMEMPOOLREQUEST = false;
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
 static const Amount DEFAULT_MIN_RELAY_TX_FEE(1000);
 /** Default for -excessutxocharge for transactions transactions */
@@ -69,27 +69,28 @@ static const Amount HIGH_TX_FEE_PER_KB(COIN / 100);
  * satoshis */
 static const Amount HIGH_MAX_TX_FEE(100 * HIGH_TX_FEE_PER_KB);
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
-static const unsigned int DEFAULT_ANCESTOR_LIMIT = 25;
+static const uint64_t DEFAULT_ANCESTOR_LIMIT = 25;
+/** Default for -limitdescendantcount, max number of in-mempool descendants */
+static const uint64_t DEFAULT_DESCENDANT_LIMIT = 25;
 /** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool
  * ancestors */
-static const unsigned int DEFAULT_ANCESTOR_SIZE_LIMIT = 101;
-/** Default for -limitdescendantcount, max number of in-mempool descendants */
-static const unsigned int DEFAULT_DESCENDANT_LIMIT = 25;
+static const uint64_t DEFAULT_ANCESTOR_SIZE_LIMIT = DEFAULT_ANCESTOR_LIMIT * MAX_TX_SIZE;
 /** Default for -limitdescendantsize, maximum kilobytes of in-mempool
  * descendants */
-static const unsigned int DEFAULT_DESCENDANT_SIZE_LIMIT = 101;
+static const uint64_t DEFAULT_DESCENDANT_SIZE_LIMIT = DEFAULT_DESCENDANT_LIMIT * MAX_TX_SIZE;
 /** Default for -mempoolexpiry, expiration time for mempool transactions in
  * hours */
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
-/** Maximum bytes for transactions to store for processing during reorg */
-static const unsigned int MAX_DISCONNECTED_TX_POOL_SIZE =
-    20 * DEFAULT_MAX_BLOCK_SIZE;
+/** Used to calculate how many bytes of transactions to store for processing during reorg
+ *  The value is multiplied with default block size to calculate actual bytes.
+ */
+static const unsigned int MAX_DISCONNECTED_TX_POOL_SIZE_FACTOR = 20;
 /** The maximum size of a blk?????.dat file (since 0.8) */
-static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
+static const unsigned int DEFAULT_PREFERRED_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
 static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
 /** The size of the header for each block in a block file */
-static const unsigned int BLOCKFILE_BLOCK_HEADER_SIZE = 8;  // 8 bytes
+static const unsigned int BLOCKFILE_BLOCK_HEADER_SIZE = 8;  // 8 bytes: - 4 bytes for disk magic + 4 bytes for size
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
 static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 
@@ -148,8 +149,7 @@ static const unsigned int INVENTORY_BROADCAST_INTERVAL = 5;
  * Maximum number of inventory items to send per transmission.
  * Limits the impact of low-fee transaction floods.
  */
-static const unsigned int INVENTORY_BROADCAST_MAX_PER_MB =
-    7 * INVENTORY_BROADCAST_INTERVAL;
+static const unsigned int INVENTORY_BROADCAST_MAX_PER_MB = 7 * INVENTORY_BROADCAST_INTERVAL;
 /** Average delay between feefilter broadcasts in seconds. */
 static const unsigned int AVG_FEEFILTER_BROADCAST_INTERVAL = 10 * 60;
 /** Maximum feefilter broadcast delay after significant change. */
@@ -176,6 +176,13 @@ static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
 static const bool DEFAULT_CHECKPOINTS_ENABLED = true;
 static const bool DEFAULT_TXINDEX = false;
 static const unsigned int DEFAULT_BANSCORE_THRESHOLD = 100;
+
+/* Default settings for controlling P2P reading */
+static const unsigned int DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS = 500;
+static const unsigned int DEFAULT_INVALID_CHECKSUM_FREQUENCY = 100;
+
+static const unsigned int DEFAULT_MIN_TIME_INTERVAL_HEADER_MS = 500;
+static const unsigned int DEFAULT_INVALID_HEADER_FREQUENCY = 2000;
 
 /** Default for -persistmempool */
 static const bool DEFAULT_PERSIST_MEMPOOL = true;
@@ -277,14 +284,20 @@ private:
     bool checkPoW : 1;
     bool checkMerkleRoot : 1;
 
+    // If true; force block to be flagged as checked
+    bool markChecked : 1;
+
 public:
-    // Do full validation by default
-    BlockValidationOptions() : checkPoW(true), checkMerkleRoot(true) {}
-    BlockValidationOptions(bool checkPoWIn, bool checkMerkleRootIn)
-        : checkPoW(checkPoWIn), checkMerkleRoot(checkMerkleRootIn) {}
+    BlockValidationOptions() : checkPoW{true}, checkMerkleRoot{true}, markChecked{false}
+    {}
+
+    BlockValidationOptions(bool checkPoWIn, bool checkMerkleRootIn, bool markCheckedIn = false)
+        : checkPoW{checkPoWIn}, checkMerkleRoot{checkMerkleRootIn}, markChecked{markCheckedIn}
+    {}
 
     bool shouldValidatePoW() const { return checkPoW; }
     bool shouldValidateMerkleRoot() const { return checkMerkleRoot; }
+    bool shouldMarkChecked() const { return markChecked; }
 };
 
 /**
@@ -337,11 +350,6 @@ bool ProcessNewBlockHeaders(const Config &config,
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 
 /**
- * Open a block file (blk?????.dat).
- */
-FILE *OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly = false);
-
-/**
  * Translation to a filesystem path.
  */
 fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
@@ -351,6 +359,9 @@ fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
  */
 bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                            CDiskBlockPos *dbp = nullptr);
+
+/** used for --reindex */
+void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& fReindex);
 
 /**
  * Initialize a new block tree database + block data on disk.
@@ -390,7 +401,6 @@ bool IsInitialBlockDownload();
  * - "rpc": get critical warnings, which should put the client in safe mode if
  * non-empty
  * - "statusbar": get all warnings
- * - "gui": get all warnings, translated (where possible) for GUI
  * This function only returns the highest priority warning of the set selected
  * by strFor.
  */
@@ -446,12 +456,6 @@ bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
 
 /** Check if DAA HF has activated. */
 bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
-
-/** Check if May 15, 2018 HF has activated. */
-bool IsMonolithEnabled(const Config &config, const CBlockIndex *pindexPrev);
-
-/** Check if November 15, 2018 HF has activated. */
-bool IsMagneticEnabled(const Config &config, const CBlockIndex *pindexPrev);
 
 /**
  * (try to) add transaction to memory pool
@@ -530,12 +534,9 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
 
 /** Transaction validation functions */
 
-/** Context-independent validity checks for coinbase and non-coinbase
- * transactions */
-bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state,
-                             bool fCheckDuplicateInputs = true);
-bool CheckCoinbase(const CTransaction &tx, CValidationState &state,
-                   bool fCheckDuplicateInputs = true);
+/** Context-independent validity checks for coinbase and non-coinbase transactions */
+bool CheckRegularTransaction(const CTransaction& tx, CValidationState& state);
+bool CheckCoinbase(const CTransaction& tx, CValidationState& state);
 
 namespace Consensus {
 
@@ -752,9 +753,6 @@ static const unsigned int REJECT_HIGHFEE = 0x100;
 static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 /** Transaction conflicts with a transaction already known */
 static const unsigned int REJECT_CONFLICT = 0x102;
-
-/** Get block file info entry for one block file */
-CBlockFileInfo *GetBlockFileInfo(size_t n);
 
 /** Dump the mempool to disk. */
 void DumpMempool();

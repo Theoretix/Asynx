@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2015-2016 The Bitcoin Core developers
 # Copyright (c) 2017 The Bitcoin developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import *
@@ -75,10 +75,6 @@ class FullBlockTest(ComparisonTestFramework):
             "--runbarelyexpensive", dest="runbarelyexpensive", default=True)
 
     def run_test(self):
-        self.test = TestManager(self, self.options.tmpdir)
-        self.test.add_all_connections(self.nodes)
-        # Start up network handling in another thread
-        NetworkThread().start()
         self.test.run()
 
     def add_transactions_to_block(self, block, tx_list):
@@ -109,7 +105,7 @@ class FullBlockTest(ComparisonTestFramework):
         tx.rehash()
         return tx
 
-    def next_block(self, number, spend=None, additional_coinbase_value=0, script=CScript([OP_TRUE]), solve=True):
+    def next_block(self, number, spend=None, additional_coinbase_value=0, script=CScript([OP_TRUE]), do_solve_block=True):
         if self.tip == None:
             base_block_hash = self.genesis_hash
             block_time = int(time.time()) + 1
@@ -133,7 +129,7 @@ class FullBlockTest(ComparisonTestFramework):
             self.sign_tx(tx, spend.tx, spend.n)
             self.add_transactions_to_block(block, [tx])
             block.hashMerkleRoot = block.calc_merkle_root()
-        if solve:
+        if do_solve_block:
             block.solve()
         self.tip = block
         self.block_heights[block.sha256] = height
@@ -673,7 +669,7 @@ class FullBlockTest(ComparisonTestFramework):
 
         # A block with invalid work
         tip(44)
-        b47 = block(47, solve=False)
+        b47 = block(47, do_solve_block=False)
         target = uint256_from_compact(b47.nBits)
         while b47.sha256 < target:  # changed > to <
             b47.nNonce += 1
@@ -682,7 +678,7 @@ class FullBlockTest(ComparisonTestFramework):
 
         # A block with timestamp > 2 hrs in the future
         tip(44)
-        b48 = block(48, solve=False)
+        b48 = block(48, do_solve_block=False)
         b48.nTime = int(time.time()) + 60 * 60 * 3
         b48.solve()
         yield rejected(RejectResult(16, b'time-too-new'))

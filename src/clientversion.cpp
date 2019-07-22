@@ -1,7 +1,6 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
-// Copyright (c) 2018 The Asynx developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "clientversion.h"
 
@@ -11,15 +10,20 @@
 
 /**
  * Name of client reported in the 'version' message. Report the same name
- * for both bitcoind and Asynx, to make it harder for attackers to
- * target servers or GUI users specifically.
+ * for both bitcoind and bitcoin-sv, to make it harder for attackers to
+ * target servers.
  */
-const std::string CLIENT_NAME("Asynx");
+const std::string CLIENT_NAME("Bitcoin SV");
 
 /**
  * Client version number
  */
-#define CLIENT_VERSION_SUFFIX ""
+#ifdef IS_PRODUCTION_BUILD
+    #define CLIENT_VERSION_SUFFIX ""
+#else
+    #define CLIENT_VERSION_SUFFIX "-dev"
+#endif
+
 
 /**
  * The following part of the code determines the CLIENT_BUILD variable.
@@ -44,10 +48,11 @@ const std::string CLIENT_NAME("Asynx");
 #endif
 
 //! git will put "#define GIT_ARCHIVE 1" on the next line inside archives.
-//! $Format:%n#define GIT_ARCHIVE 1$
+//! 
+#define GIT_ARCHIVE 1
 #ifdef GIT_ARCHIVE
-#define GIT_COMMIT_ID "$Format:%h$"
-#define GIT_COMMIT_DATE "$Format:%cD$"
+#define GIT_COMMIT_ID "f5503f0fe"
+#define GIT_COMMIT_DATE "Wed, 26 Jun 2019 20:13:30 +0000"
 #endif
 
 #define BUILD_DESC_WITH_SUFFIX(maj, min, rev, build, suffix)                   \
@@ -83,7 +88,7 @@ const std::string CLIENT_NAME("Asynx");
 const std::string CLIENT_BUILD(BUILD_DESC CLIENT_VERSION_SUFFIX);
 
 static std::string FormatVersion(int shiftedVersion) {
-	const int nVersion = shiftedVersion>_ASYNX_VERSION_SHIFT ? shiftedVersion-_ASYNX_VERSION_SHIFT : shiftedVersion;
+	const int nVersion = shiftedVersion>_SV_VERSION_SHIFT ? shiftedVersion-_SV_VERSION_SHIFT : shiftedVersion;
     if (nVersion % 100 == 0)
         return strprintf("%d.%d.%d", nVersion / 1000000,
                          (nVersion / 10000) % 100, (nVersion / 100) % 100);

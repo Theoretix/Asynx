@@ -14,7 +14,7 @@ For example:
 
 A prefix will be generated that's suitable for plugging into Bitcoin's
 configure. In the above example, a dir named x86_64-w64-mingw32 will be
-created. To use it for Asynx:
+created. To use it for bitcoin-sv:
 
     ./configure --prefix=`pwd`/depends/x86_64-w64-mingw32
 
@@ -35,7 +35,6 @@ The following can be set when running make: make FOO=bar
     BASE_CACHE: built packages will be placed here
     SDK_PATH: Path where sdk's can be found (used by OSX)
     FALLBACK_DOWNLOAD_PATH: If a source file can't be fetched, try here before giving up
-    NO_QT: Don't download/build/cache qt and its dependencies
     NO_WALLET: Don't download/build/cache libs needed to enable the wallet
     NO_UPNP: Don't download/build/cache packages needed for enabling upnp
     DEBUG: disable some optimizations and enable more runtime checking

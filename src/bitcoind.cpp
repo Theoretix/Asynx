@@ -1,8 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2018 The Asynx developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying LICENSE.
 
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
@@ -27,21 +26,22 @@
 
 #include <cstdio>
 
+
 /* Introduction text for doxygen: */
 
 /*! \mainpage Developer documentation
  *
  * \section intro_sec Introduction
  *
- * This is the developer documentation of Asynx
- * (https://asynx.io/). Asynx is a client for the digital
- * currency called Bitcoin Cash (https://www.bitcoincash.org/), which enables
- * instant payments to anyone, anywhere in the world. Bitcoin Cash uses
+ * This is the developer documentation of Bitcoin SV
+ * (https://bitcoinsv.io/). Bitcoin SV is a client for the digital
+ * currency called Bitcoin SV, which enables
+ * instant payments to anyone, anywhere in the world. Bitcoin SV uses
  * peer-to-peer technology to operate with no central authority: managing
  * transactions and issuing money are carried out collectively by the network.
  *
  * The software is a community-driven open source project, released under the
- * MIT license.
+ * Open BSV license.
  *
  * \section Navigation
  * Use the buttons <code>Namespaces</code>, <code>Classes</code> or
@@ -79,7 +79,6 @@ bool AppInit(int argc, char *argv[]) {
     //
     // Parameters
     //
-    // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's
     // main()
     gArgs.ParseParameters(argc, argv);
 
@@ -126,6 +125,9 @@ bool AppInit(int argc, char *argv[]) {
             return false;
         }
 
+        // Fill config with block size data
+        config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+
         // Command-line RPC
         bool fCommandLine = false;
         for (int i = 1; i < argc; i++)
@@ -139,8 +141,7 @@ bool AppInit(int argc, char *argv[]) {
                             "instead.\n");
             exit(EXIT_FAILURE);
         }
-        // -server defaults to true for bitcoind but not for the GUI so do this
-        // here
+        // -server defaults to true for bitcoind
         gArgs.SoftSetBoolArg("-server", true);
         // Set this early so that parameter interactions go to console
         InitLogging();
@@ -193,8 +194,11 @@ bool AppInit(int argc, char *argv[]) {
         // don't result in a hang due to some
         // thread-blocking-waiting-for-another-thread-during-startup case.
     } else {
+        LogPrintf("Preload wait for shutdown\n");
         WaitForShutdown(&threadGroup);
+        LogPrintf("Preload wait for shutdown done\n");
     }
+    LogPrintf("Checking Thread shutdown\n");
     Shutdown();
 
     return fRet;

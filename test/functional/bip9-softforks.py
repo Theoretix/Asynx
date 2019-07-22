@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2015-2016 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 '''
 This test is meant to exercise BIP forks
@@ -35,10 +35,16 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         self.extra_args = [['-whitelist=127.0.0.1']]
         self.setup_clean_chain = True
 
+    def reset_network(self):
+        extra_args = [['-whitelist=127.0.0.1']] * self.num_nodes
+        if hasattr(self, "extra_args"):
+            extra_args = self.extra_args
+        self.add_nodes(self.num_nodes, extra_args,
+                       binaries=[self.options.testbinary] +
+                       [self.options.refbinary] * (self.num_nodes - 1))
+        self.start_nodes()
+
     def run_test(self):
-        self.test = TestManager(self, self.options.tmpdir)
-        self.test.add_all_connections(self.nodes)
-        NetworkThread().start()  # Start up network handling in another thread
         self.test.run()
 
     def create_transaction(self, node, coinbase, to_address, amount):
@@ -213,7 +219,7 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         self.nodes = []
         shutil.rmtree(self.options.tmpdir + "/node0")
         self.setup_chain()
-        self.setup_network()
+        self.reset_network()
         self.test.add_all_connections(self.nodes)
         NetworkThread().start()
         self.test.test_nodes[0].wait_for_verack()

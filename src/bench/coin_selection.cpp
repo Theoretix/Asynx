@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "bench.h"
 #include "chainparams.h"
@@ -34,6 +34,7 @@ static void addCoin(const Amount nValue, const CWallet &wallet,
 // either for measurements."
 // (https://github.com/bitcoin/bitcoin/issues/7883#issuecomment-224807484)
 static void CoinSelection(benchmark::State &state) {
+    SelectParams(CBaseChainParams::TESTNET);
     const CWallet wallet(Params());
     std::vector<COutput> vCoins;
     LOCK(wallet.cs_wallet);

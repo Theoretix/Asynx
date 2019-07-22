@@ -1,7 +1,6 @@
 // Copyright (c) 2017 The Bitcoin developers
-// Copyright (c) 2018 The Bitcoin SV developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2018-2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "test/scriptflags.h"
 
@@ -31,9 +30,6 @@ static std::map<std::string, uint32_t> mapFlagNames = {
     {"CHECKSEQUENCEVERIFY", SCRIPT_VERIFY_CHECKSEQUENCEVERIFY},
     {"COMPRESSED_PUBKEYTYPE", SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE},
     {"SIGHASH_FORKID", SCRIPT_ENABLE_SIGHASH_FORKID},
-    {"REPLAY_PROTECTION", SCRIPT_ENABLE_REPLAY_PROTECTION},
-    {"MONOLITH_OPCODES", SCRIPT_ENABLE_MONOLITH_OPCODES},
-    {"MAGNETIC_OPCODES", SCRIPT_ENABLE_MAGNETIC_OPCODES},
 };
 
 uint32_t ParseScriptFlags(std::string strFlags) {

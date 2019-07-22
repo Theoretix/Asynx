@@ -1,6 +1,6 @@
 // Copyright (c) 2015-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "bench.h"
 
@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
     ECC_Start();
     SetupEnvironment();
 
-    // don't want to write to debug.log file
+    // don't want to write to bitcoind.log file
     GetLogger().fPrintToDebugLog = false;
 
     benchmark::BenchRunner::RunAll();

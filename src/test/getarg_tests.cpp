@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2015 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "test/test_bitcoin.h"
 #include "util.h"
@@ -112,16 +112,15 @@ BOOST_AUTO_TEST_CASE(intarg) {
     BOOST_CHECK_EQUAL(gArgs.GetArg("-foo", 0), 0);
 
     ResetArgs("-foo -bar");
-    BOOST_CHECK_EQUAL(gArgs.GetArg("-foo", 11), 0);
-    BOOST_CHECK_EQUAL(gArgs.GetArg("-bar", 11), 0);
-
+	BOOST_CHECK_EQUAL(gArgs.GetArg("-foo",11),11);
+	BOOST_CHECK_EQUAL(gArgs.GetArg("-bar",11),11);
     ResetArgs("-foo=11 -bar=12");
     BOOST_CHECK_EQUAL(gArgs.GetArg("-foo", 0), 11);
     BOOST_CHECK_EQUAL(gArgs.GetArg("-bar", 11), 12);
 
     ResetArgs("-foo=NaN -bar=NotANumber");
-    BOOST_CHECK_EQUAL(gArgs.GetArg("-foo", 1), 0);
-    BOOST_CHECK_EQUAL(gArgs.GetArg("-bar", 11), 0);
+	BOOST_CHECK_EQUAL(gArgs.GetArg("-foo",1),1);
+	BOOST_CHECK_EQUAL(gArgs.GetArg("-bar",11),11);
 }
 
 BOOST_AUTO_TEST_CASE(doubledash) {

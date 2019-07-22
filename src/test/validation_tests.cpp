@@ -1,7 +1,7 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
 // Copyright (c) 2017 The Bitcoin developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "chainparams.h"
 #include "config.h"
@@ -49,7 +49,7 @@ BOOST_AUTO_TEST_CASE(validation_load_external_block_file) {
     // serialization format is:
     // message start magic, size of block, block
 
-    size_t nwritten = fwrite(std::begin(chainparams.DiskMagic()),
+    size_t nwritten = fwrite(chainparams.DiskMagic().data(),
                              CMessageHeader::MESSAGE_START_SIZE, 1, fp);
 
     BOOST_CHECK_EQUAL(nwritten, 1UL);

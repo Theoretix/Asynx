@@ -1,9 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2018 The Bitcoin SV developers
-// Copyright (c) 2018 The Asynx developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2018-2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_CONSENSUS_CONSENSUS_H
 #define BITCOIN_CONSENSUS_CONSENSUS_H
@@ -14,14 +12,13 @@
 static const uint64_t ONE_KILOBYTE = 1000;
 /** 1MB */
 static const uint64_t ONE_MEGABYTE = ONE_KILOBYTE * 1000;
+/** 1GB */
+static const uint64_t ONE_GIGABYTE = ONE_MEGABYTE * 1000;
 /** The maximum allowed size for a transaction, in bytes */
 static const uint64_t MAX_TX_SIZE = ONE_MEGABYTE;
 /** The maximum allowed size for a block, before the UAHF */
 static const uint64_t LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE;
-/** Default setting for maximum allowed size for a block, in bytes */
-static const uintmax_t DEFAULT_MAX_BLOCK_SIZE = 2097152 * ONE_MEGABYTE;
-/** Pre Nov 2018 default setting for maximum allowed size for a block, in bytes */
-static const uint64_t LEGACY_DEFAULT_MAX_BLOCK_SIZE = 32 * ONE_MEGABYTE;
+
 /**
  * The maximum allowed number of signature check operations per MB in a block
  * (network rule).

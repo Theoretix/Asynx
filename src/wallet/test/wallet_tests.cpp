@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "wallet/wallet.h"
 
@@ -11,6 +11,7 @@
 #include "validation.h"
 #include "wallet/rpcdump.h"
 #include "wallet/test/wallet_test_fixture.h"
+#include "blockfileinfostore.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -235,13 +236,13 @@ BOOST_AUTO_TEST_CASE(coin_selection_tests) {
         add_coin(wallet, 4 * COIN);
         BOOST_CHECK(wallet.SelectCoinsMinConf(95 * CENT, 1, 1, 0, vCoins,
                                               setCoinsRet, nValueRet));
-        // we should get 1 BCH in 1 coin
+        // we should get 1 BSV in 1 coin
         BOOST_CHECK_EQUAL(nValueRet, 1 * COIN);
         BOOST_CHECK_EQUAL(setCoinsRet.size(), 1U);
 
         BOOST_CHECK(wallet.SelectCoinsMinConf(195 * CENT, 1, 1, 0, vCoins,
                                               setCoinsRet, nValueRet));
-        // we should get 2 BCH in 1 coin
+        // we should get 2 BSV in 1 coin
         BOOST_CHECK_EQUAL(nValueRet, 2 * COIN);
         BOOST_CHECK_EQUAL(setCoinsRet.size(), 1U);
 
@@ -453,7 +454,8 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
 
     // Cap last block file size, and mine new block in a new block file.
     CBlockIndex *oldTip = chainActive.Tip();
-    GetBlockFileInfo(oldTip->GetBlockPos().nFile)->nSize = MAX_BLOCKFILE_SIZE;
+    pBlockFileInfoStore->GetBlockFileInfo(oldTip->GetBlockPos().nFile)->nSize =
+        DEFAULT_PREFERRED_BLOCKFILE_SIZE;
     CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
     CBlockIndex *newTip = chainActive.Tip();
 

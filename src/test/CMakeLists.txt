@@ -1,9 +1,16 @@
 # Copyright (c) 2018 The Bitcoin developers
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 project(bitcoin-test)
 
 # Process json files.
-find_program(PYTHON python)
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
+
+# Python is required to build C++ tests (and to execute functional tests)
+find_package(PythonInterp 3 REQUIRED)
+
+
 function(gen_json_header NAME)
 	set(HEADERS "")
 	foreach(f ${ARGN})
@@ -12,7 +19,7 @@ function(gen_json_header NAME)
 		# Get the proper name for the test variable.
 		get_filename_component(TEST_NAME ${f} NAME_WE)
 		add_custom_command(OUTPUT ${h}
-			COMMAND ${PYTHON}
+			COMMAND ${PYTHON_EXECUTABLE}
 			ARGS
 				"${CMAKE_CURRENT_SOURCE_DIR}/data/generate_header.py"
 				"${TEST_NAME}"
@@ -55,8 +62,6 @@ add_test_to_suite(bitcoin test_bitcoin
 	blockstatus_tests.cpp
 	bloom_tests.cpp
 	bswap_tests.cpp
-	cashaddr_tests.cpp
-	cashaddrenc_tests.cpp
 	checkpoints_tests.cpp
 	coins_tests.cpp
 	compress_tests.cpp
@@ -74,10 +79,12 @@ add_test_to_suite(bitcoin test_bitcoin
 	jsonutil.cpp
 	key_tests.cpp
 	limitedmap_tests.cpp
+	m_candidates_tests.cpp
 	main_tests.cpp
 	mempool_tests.cpp
 	merkle_tests.cpp
 	miner_tests.cpp
+    mod_pri_queue_tests.cpp
 	opcode_tests.cpp
 	multisig_tests.cpp
 	net_tests.cpp
@@ -86,13 +93,13 @@ add_test_to_suite(bitcoin test_bitcoin
 	policyestimator_tests.cpp
 	pow_tests.cpp
 	prevector_tests.cpp
+	protocol_tests.cpp
 	raii_event_tests.cpp
 	random_tests.cpp
 	reverselock_tests.cpp
 	rpc_tests.cpp
 	sanity_tests.cpp
 	scheduler_tests.cpp
-	script_commitment_tests.cpp
 	script_P2SH_tests.cpp
 	script_tests.cpp
 	scriptflags.cpp
@@ -107,6 +114,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	test_bitcoin.cpp
 	test_bitcoin_main.cpp
 	testutil.cpp
+    threadpool_tests.cpp
 	timedata_tests.cpp
 	transaction_tests.cpp
 	txvalidationcache_tests.cpp

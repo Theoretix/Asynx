@@ -1,6 +1,6 @@
 // Copyright (c) 2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include <iostream>
 
@@ -59,7 +59,7 @@ static void SipHash_32b(benchmark::State &state) {
     uint256 x;
     while (state.KeepRunning()) {
         for (int i = 0; i < 1000000; i++) {
-            *((uint64_t *)x.begin()) = SipHashUint256(0, i, x);
+            *reinterpret_cast<uint64_t *>(x.begin()) = SipHashUint256(0, i, x);
         }
     }
 }

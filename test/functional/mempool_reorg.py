@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #
 # Test re-org scenarios with a mempool that contains transactions
@@ -17,7 +17,7 @@ from test_framework.util import *
 class MempoolCoinbaseTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
-        self.extra_args = [["-checkmempool", "-monolithactivationtime=0"]] * 2
+        self.extra_args = [["-checkmempool"]] * 2
 
     alert_filename = None  # Set by setup_network
 

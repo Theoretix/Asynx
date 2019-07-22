@@ -17,15 +17,11 @@ Build-Depends: debhelper,
  libboost-program-options-dev (>> 1.35) | libboost-program-options1.35-dev,
  libboost-thread-dev (>> 1.35) | libboost-thread1.35-dev,
  libboost-test-dev (>> 1.35) | libboost-test1.35-dev,
- qt4-qmake,
- libqt4-dev,
- libqrencode-dev,
- libprotobuf-dev, protobuf-compiler,
  python
 Standards-Version: 3.9.2
-Homepage: https://asynx.io/
-Vcs-Git: https://github.com/Theoretix/Asynx.git
-Vcs-Browser: https://github.com/Theoretix/Asynx
+Homepage: https://bitcoinsv.io/
+Vcs-Git: https://github.com/bitcoin-sv/bitcoin-sv.git
+Vcs-Browser: https://github.com/bitcoin-sv/bitcoin-sv
 
 Package: bitcoind
 Architecture: any
@@ -34,23 +30,11 @@ Description: peer-to-peer network based digital currency - daemon
  Bitcoin is an experimental new digital currency that enables instant
  payments to anyone, anywhere in the world. Bitcoin uses peer-to-peer
  technology to operate with no central authority: managing transactions
- and issuing money are carried out collectively by the network. Asynx
+ and issuing money are carried out collectively by the network. Bitcoin SV
  is the name of the open source software which enables the use of this currency.
  .
  This package provides the daemon, bitcoind, and the CLI tool
  bitcoin-cli to interact with the daemon.
-
-Package: bitcoin-qt
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: peer-to-peer network based digital currency - Qt GUI
- Bitcoin is an experimental new digital currency that enables instant
- payments to anyone, anywhere in the world. Bitcoin uses peer-to-peer
- technology to operate with no central authority: managing transactions
- and issuing money are carried out collectively by the network. Asynx
- is the name of the open source software which enables the use of this currency.
- .
- This package provides Bitcoin-Qt, a GUI for Bitcoin based on Qt.
 
 Package: bitcoin-tx
 Architecture: any
@@ -59,7 +43,7 @@ Description: peer-to-peer digital currency - standalone transaction tool
  Bitcoin is an experimental new digital currency that enables instant
  payments to anyone, anywhere in the world. Bitcoin uses peer-to-peer
  technology to operate with no central authority: managing transactions
- and issuing money are carried out collectively by the network. Asynx
+ and issuing money are carried out collectively by the network. Bitcoin SV
  is the name of the open source software which enables the use of this currency.
  .
  This package provides bitcoin-tx, a command-line transaction creation

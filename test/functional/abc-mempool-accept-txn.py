@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2017 The Bitcoin developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 """
 This test checks acceptance of transactions by the mempool
@@ -51,6 +51,7 @@ class FullBlockTest(ComparisonTestFramework):
         self.extra_args = [['-norelaypriority']]
         self.add_nodes(self.num_nodes, self.extra_args)
         self.start_nodes()
+        self.init_network()
 
     def add_options(self, parser):
         super().add_options(parser)
@@ -58,10 +59,6 @@ class FullBlockTest(ComparisonTestFramework):
             "--runbarelyexpensive", dest="runbarelyexpensive", default=True)
 
     def run_test(self):
-        self.test = TestManager(self, self.options.tmpdir)
-        self.test.add_all_connections(self.nodes)
-        # Start up network handling in another thread
-        NetworkThread().start()
         self.test.run()
 
     def add_transactions_to_block(self, block, tx_list):

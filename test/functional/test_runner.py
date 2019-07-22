@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
 # Copyright (c) 2017 The Bitcoin developers
-# Copyright (c) 2018 The Asynx developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Run regression test suite.
 
 This module calls down into individual test cases via subprocess. It will
 forward all unrecognized arguments onto the individual test scripts.
-
-Functional tests are disabled on Windows by default. Use --force to run them anyway.
 
 For a description of arguments recognized by test scripts, see
 `test/functional/test_framework/test_framework.py:BitcoinTestFramework.main`.
@@ -64,7 +61,7 @@ NON_SCRIPTS = [
 
 TEST_PARAMS = {
     # Some test can be run with additional parameters.
-    # When a test is listed here, the it  will be run without parameters
+    # When a test is listed here, then it will be run without parameters
     # as well as with additional parameters listed here.
     # This:
     #    example "testName" : [["--param1", "--param2"] , ["--param3"]]
@@ -73,7 +70,13 @@ TEST_PARAMS = {
     #    testName --param1 --param2
     #    testname --param3
     "txn_doublespend.py": [["--mineblock"]],
-    "txn_clone.py": [["--mineblock"]]
+    "txn_clone.py": [["--mineblock"]],
+    # Test with blocks larger than preferredBlockfileSize.
+    "bsv-128Mb-blocks.py": [["--excessiveblocksize=130000000"]],
+
+    # Run  automatic block size validation size with default activation time as well as overriden time
+    "bsv-block-size-activation-generated-default.py": [["--blocksizeactivationtime=1563197777"]],
+    "bsv-block-size-activation-default.py": [["--blocksizeactivationtime=1563197777"]]
 }
 
 # Used to limit the number of tests, when list of tests is not provided on command line
@@ -110,8 +113,6 @@ def main():
         '--exclude', '-x', help='specify a comma-seperated-list of scripts to exclude. Do not include the .py extension in the name.')
     parser.add_argument('--extended', action='store_true',
                         help='run the extended test suite in addition to the basic tests')
-    parser.add_argument('--force', '-f', action='store_true',
-                        help='run tests even on platforms where they are disabled by default (e.g. windows).')
     parser.add_argument('--help', '-h', '-?',
                         action='store_true', help='print help text and exit')
     parser.add_argument('--jobs', '-j', type=int, default=4,
@@ -124,6 +125,9 @@ def main():
                         default=tempfile.gettempdir(), help="Root directory for datadirs")
     parser.add_argument('--junitouput', '-ju',
                         default=os.path.join(build_dir, 'junit_results.xml'), help="file that will store JUnit formated test results.")
+    parser.add_argument('--buildconfig', '-b',
+                        default="", help="Optional name of directory that contains binary and is located inside build directory. Used on Windows where "
+                        "the build directory can contain outputs for multiple configurations. Example: -b RelWithDebInfo.")
 
     args, unknown_args = parser.parse_known_args()
 
@@ -146,13 +150,6 @@ def main():
     enable_wallet = config["components"].getboolean("ENABLE_WALLET")
     enable_utils = config["components"].getboolean("ENABLE_UTILS")
     enable_bitcoind = config["components"].getboolean("ENABLE_BITCOIND")
-
-    if config["environment"]["EXEEXT"] == ".exe" and not args.force:
-        # https://github.com/bitcoin/bitcoin/commit/d52802551752140cf41f0d9a225a43e84404d3e9
-        # https://github.com/bitcoin/bitcoin/pull/5677#issuecomment-136646964
-        print(
-            "Tests currently disabled on Windows by default. Use --force option to enable")
-        sys.exit(0)
 
     if not (enable_wallet and enable_utils and enable_bitcoind):
         print(
@@ -210,7 +207,7 @@ def main():
         # and exit.
         parser.print_help()
         subprocess.check_call(
-            [os.path.join(tests_dir, test_list[0]), '-h'])
+            [sys.executable, os.path.join(tests_dir, test_list[0]), '-h'])
         sys.exit(0)
 
     if not args.keepcache:
@@ -218,10 +215,10 @@ def main():
                                    "cache"), ignore_errors=True)
 
     run_tests(test_list, build_dir, tests_dir, args.junitouput,
-              config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings)
+              config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings, args.buildconfig)
 
 
-def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=1, enable_coverage=False, args=[], build_timings=None):
+def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=1, enable_coverage=False, args=[],  build_timings=None, buildconfig=""):
     # Warn if bitcoind is already running (unix only)
     try:
         pidofOutput = subprocess.check_output(["pidof", "bitcoind"])
@@ -240,9 +237,20 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
     # Set env vars
     if "BITCOIND" not in os.environ:
         os.environ["BITCOIND"] = os.path.join(
-            build_dir, 'src', 'bitcoind' + exeext)
+            build_dir, 'src', buildconfig, 'bitcoind' + exeext)
         os.environ["BITCOINCLI"] = os.path.join(
-            build_dir, 'src', 'bitcoin-cli' + exeext)
+            build_dir, 'src', buildconfig, 'bitcoin-cli' + exeext)
+
+    if not os.path.isfile(os.environ["BITCOIND"]):
+        print("%sERROR!%s Can not find bitcoind executable here: %s. " % (
+            BOLD[1], BOLD[0], os.environ["BITCOIND"]))
+        sys.exit(0)
+
+    if not os.path.isfile(os.environ["BITCOINCLI"]):
+        print("%sERROR!%s Can not find bitcoin-cli executable here: %s. " % (
+            BOLD[1], BOLD[0], os.environ["BITCOINCLI"]))
+        sys.exit(0)
+
 
     flags = [os.path.join("--srcdir={}".format(build_dir), "src")] + args
     flags.append("--cachedir=%s" % cache_dir)
@@ -256,8 +264,11 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
 
     if len(test_list) > 1 and jobs > 1:
         # Populate cache
-        subprocess.check_output(
-            [os.path.join(tests_dir, 'create_cache.py')] + flags + [os.path.join("--tmpdir=%s", "cache") % tmpdir])
+        try:
+            subprocess.check_output([sys.executable, os.path.join(tests_dir, 'create_cache.py')] + flags + [os.path.join("--tmpdir=%s", "cache") % tmpdir])
+        except subprocess.CalledProcessError as e:
+            sys.stdout.buffer.write(e.output)
+            raise
 
     # Run Tests
     job_queue = TestHandler(jobs, tests_dir, tmpdir, test_list, flags)
@@ -360,7 +371,7 @@ class TestHandler:
                       (self.tmpdir, re.sub(".py$", "", t), portseed)]
             self.jobs.append((t,
                               time.time(),
-                              subprocess.Popen([os.path.join(self.tests_dir, test_argv[0])] + test_argv[1:] + self.flags + portseed_arg + tmpdir,
+                              subprocess.Popen([sys.executable, os.path.join(self.tests_dir, test_argv[0])] + test_argv[1:] + self.flags + portseed_arg + tmpdir,
                                                universal_newlines=True,
                                                stdout=log_stdout,
                                                stderr=log_stderr),
@@ -534,7 +545,7 @@ def save_results_as_junit(test_results, file_name, time):
     See http://llg.cubic.org/docs/junit/ for specification of format
     """
     e_test_suite = ET.Element("testsuite",
-                              {"name": "asynx_tests",
+                              {"name": "bitcoin_sv_tests",
                                "tests": str(len(test_results)),
                                #"errors":
                                "failures": str(len([t for t in test_results if t.status == "Failed"])),

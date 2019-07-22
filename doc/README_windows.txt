@@ -1,24 +1,19 @@
-Asynx
+Bitcoin SV
 =====================
 
 Intro
 -----
-Bitcoin is a free open source peer-to-peer electronic cash system that is
-completely decentralized, without the need for a central server or trusted
-parties.  Users hold the crypto keys to their own money and transact directly
-with each other, with the help of a P2P network to check for double-spending.
-
+Bitcoin SV is an implementation of a node for the Bitcoin SV network and is one of the pieces of software that provide
+the backbone of the network. It downloads and stores the entire history of Bitcoin SV transactions (which is currently
+several GBs); depending on the speed of your computer and network connection, the synchronization process can take
+anywhere from a few hours to a day or more.
 
 Setup
 -----
-Unpack the files into a directory and run bitcoin-qt.exe.
+Unpack the files into a directory and run bitcoind.exe.
 
-Asynx is based on Bitcoin SV, which is the original Bitcoin Cash client and
-builds the backbone of the network. It downloads and stores the entire history
-of Bitcoin transactions; depending on the speed of your computer and network
-connection, the synchronization process can take anywhere from a few hours to
-a day or more.
+### Need Help?
 
-See the bitcoin wiki at:
-  https://en.bitcoin.it/wiki/Main_Page
-for more help and information.
+* Log an issue on [GitHub] (https://github.com/bitcoin-sv/bitcoin-sv/issues)
+* Ask for help on the [Bitcoin SV Subreddit](https://www.reddit.com/r/bitcoinSV/) or
+[Bictoin SV Subreddit](https://www.reddit.com/r/bitcoincashSV/).

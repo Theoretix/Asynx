@@ -1,8 +1,8 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "miner.h"
+#include "mining/factory.h"
 
 #include "chainparams.h"
 #include "coins.h"
@@ -125,11 +125,12 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
                              .SpendsCoinbase(false)
                              .FromTx(tx));
 
+    CBlockIndex* pindexPrev {nullptr};
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-        BlockAssembler(config).CreateNewBlock(scriptPubKey);
-    BOOST_CHECK(pblocktemplate->block.vtx[1]->GetId() == parentTxId);
-    BOOST_CHECK(pblocktemplate->block.vtx[2]->GetId() == highFeeTxId);
-    BOOST_CHECK(pblocktemplate->block.vtx[3]->GetId() == mediumFeeTxId);
+        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[1]->GetId() == parentTxId);
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[2]->GetId() == highFeeTxId);
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[3]->GetId() == mediumFeeTxId);
 
     // Test that a package below the block min tx fee doesn't get included
     tx.vin[0].prevout = COutPoint(highFeeTxId, 0);
@@ -147,9 +148,9 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     tx.vout[0].nValue = Amount(5000000000LL - 1000 - 50000) - feeToUse;
     TxId lowFeeTxId = tx.GetId();
     mempool.addUnchecked(lowFeeTxId, entry.Fee(feeToUse).FromTx(tx));
-    pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptPubKey);
+    pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
     // Verify that the free tx and the low fee tx didn't get selected.
-    for (const auto &txn : pblocktemplate->block.vtx) {
+    for (const auto &txn : pblocktemplate->GetBlockRef()->vtx) {
         BOOST_CHECK(txn->GetId() != freeTxId);
         BOOST_CHECK(txn->GetId() != lowFeeTxId);
     }
@@ -163,9 +164,9 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     lowFeeTxId = tx.GetId();
     mempool.addUnchecked(lowFeeTxId,
                          entry.Fee(feeToUse + Amount(2)).FromTx(tx));
-    pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptPubKey);
-    BOOST_CHECK(pblocktemplate->block.vtx[4]->GetId() == freeTxId);
-    BOOST_CHECK(pblocktemplate->block.vtx[5]->GetId() == lowFeeTxId);
+    pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[4]->GetId() == freeTxId);
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[5]->GetId() == lowFeeTxId);
 
     // Test that transaction selection properly updates ancestor fee
     // calculations as ancestor transactions get included in a block. Add a
@@ -187,10 +188,10 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     TxId lowFeeTxId2 = tx.GetId();
     mempool.addUnchecked(lowFeeTxId2,
                          entry.Fee(feeToUse).SpendsCoinbase(false).FromTx(tx));
-    pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptPubKey);
+    pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
 
     // Verify that this tx isn't selected.
-    for (const auto &txn : pblocktemplate->block.vtx) {
+    for (const auto &txn : pblocktemplate->GetBlockRef()->vtx) {
         BOOST_CHECK(txn->GetId() != freeTxId2);
         BOOST_CHECK(txn->GetId() != lowFeeTxId2);
     }
@@ -201,13 +202,14 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     // 10k satoshi fee.
     tx.vout[0].nValue = Amount(100000000 - 10000);
     mempool.addUnchecked(tx.GetId(), entry.Fee(Amount(10000)).FromTx(tx));
-    pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptPubKey);
-    BOOST_CHECK(pblocktemplate->block.vtx[8]->GetId() == lowFeeTxId2);
+    pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[8]->GetId() == lowFeeTxId2);
 }
 
 void TestCoinbaseMessageEB(uint64_t eb, std::string cbmsg) {
 
     GlobalConfig config;
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     config.SetMaxBlockSize(eb);
 
     CScript scriptPubKey =
@@ -216,10 +218,12 @@ void TestCoinbaseMessageEB(uint64_t eb, std::string cbmsg) {
                               "de5c384df7ba0b8d578a4c702b6bf11d5f")
                   << OP_CHECKSIG;
 
+    CBlockIndex* pindexPrev {nullptr};
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-        BlockAssembler(config).CreateNewBlock(scriptPubKey);
+            CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
 
-    CBlock *pblock = &pblocktemplate->block;
+    CBlockRef blockRef = pblocktemplate->GetBlockRef();
+    CBlock *pblock = blockRef.get();
 
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
     unsigned int extraNonce = 0;
@@ -258,13 +262,15 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     entry.nHeight = 11;
 
     GlobalConfig config;
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+    config.SetTestBlockCandidateValidity(true);
 
     LOCK(cs_main);
     fCheckpointsEnabled = false;
 
     // Simple block creation, nothing special yet:
-    BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+    CBlockIndex* pindexPrev {nullptr};
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
 
     // We can't make transactions until we have inputs. Therefore, load 100
     // blocks :)
@@ -272,7 +278,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     std::vector<CTransactionRef> txFirst;
     for (size_t i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i) {
         // pointer for convenience.
-        CBlock *pblock = &pblocktemplate->block;
+        CBlockRef blockRef = pblocktemplate->GetBlockRef();
+        CBlock *pblock = blockRef.get();
         pblock->nVersion = 1;
         pblock->nTime = chainActive.Tip()->GetMedianTimePast() + 1;
         CMutableTransaction txCoinbase(*pblock->vtx[0]);
@@ -296,8 +303,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     }
 
     // Just to make sure we can still make simple blocks.
-    BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
 
     const Amount BLOCKSUBSIDY = 50 * COIN;
     const Amount LOWFEE = CENT;
@@ -318,7 +324,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         // Only first tx spends coinbase.
         bool spendsCoinbase = (i == 0) ? true : false;
         // If we don't set the # of sig ops in the CTxMemPoolEntry, template
-        // creation fails.
+        // creation fails when validating.
         mempool.addUnchecked(hash,
                              entry.Fee(LOWFEE)
                                  .Time(GetTime())
@@ -326,8 +332,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
                                  .FromTx(tx));
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
-    BOOST_CHECK_THROW(BlockAssembler(config).CreateNewBlock(scriptPubKey),
-                      std::runtime_error);
+    config.SetTestBlockCandidateValidity(false);
+    BOOST_CHECK_NO_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
+    config.SetTestBlockCandidateValidity(true);
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     mempool.clear();
 
     tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
@@ -347,8 +355,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
                                  .FromTx(tx));
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
-    BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
     mempool.clear();
 
     // block size > limit
@@ -374,15 +381,16 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
                                  .FromTx(tx));
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
-    BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
     mempool.clear();
 
     // Orphan in mempool, template creation fails.
     hash = tx.GetId();
     mempool.addUnchecked(hash, entry.Fee(LOWFEE).Time(GetTime()).FromTx(tx));
-    BOOST_CHECK_THROW(BlockAssembler(config).CreateNewBlock(scriptPubKey),
-                      std::runtime_error);
+    config.SetTestBlockCandidateValidity(false);
+    BOOST_CHECK_NO_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
+    config.SetTestBlockCandidateValidity(true);
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     mempool.clear();
 
     // Child with higher priority than parent.
@@ -403,8 +411,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     mempool.addUnchecked(
         hash,
         entry.Fee(HIGHERFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
     mempool.clear();
 
     // Coinbase in mempool, template creation fails.
@@ -417,8 +424,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     mempool.addUnchecked(
         hash,
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    BOOST_CHECK_THROW(BlockAssembler(config).CreateNewBlock(scriptPubKey),
-                      std::runtime_error);
+    config.SetTestBlockCandidateValidity(false);
+    BOOST_CHECK_NO_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
+    config.SetTestBlockCandidateValidity(true);
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     mempool.clear();
 
     // Invalid (pre-p2sh) txn in mempool, template creation fails.
@@ -449,8 +458,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     mempool.addUnchecked(
         hash,
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    BOOST_CHECK_THROW(BlockAssembler(config).CreateNewBlock(scriptPubKey),
-                      std::runtime_error);
+    config.SetTestBlockCandidateValidity(false);
+    BOOST_CHECK_NO_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
+    config.SetTestBlockCandidateValidity(true);
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     mempool.clear();
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Restore the MedianTimePast.
@@ -472,8 +483,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     mempool.addUnchecked(
         hash,
         entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK_THROW(BlockAssembler(config).CreateNewBlock(scriptPubKey),
-                      std::runtime_error);
+    config.SetTestBlockCandidateValidity(false);
+    BOOST_CHECK_NO_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
+    config.SetTestBlockCandidateValidity(true);
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     mempool.clear();
 
     // Subsidy changing.
@@ -489,8 +502,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         next->BuildSkip();
         chainActive.SetTip(next);
     }
-    BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
     // Extend to a 210000-long block chain.
     while (chainActive.Tip()->nHeight < 210000) {
         CBlockIndex *prev = chainActive.Tip();
@@ -502,8 +514,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         next->BuildSkip();
         chainActive.SetTip(next);
     }
-    BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
     // Delete the dummy blocks again.
     while (chainActive.Tip()->nHeight > nHeight) {
         CBlockIndex *del = chainActive.Tip();
@@ -675,14 +686,13 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     // Sequence locks fail.
     BOOST_CHECK(!TestSequenceLocks(CTransaction(tx), flags));
 
-    BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
 
     // None of the of the absolute height/time locked tx should have made it
     // into the template because we still check IsFinalTx in CreateNewBlock, but
     // relative locked txs will if inconsistently added to mempool. For now
     // these will still generate a valid template until BIP68 soft fork.
-    BOOST_CHECK_EQUAL(pblocktemplate->block.vtx.size(), 3UL);
+    BOOST_CHECK_EQUAL(pblocktemplate->GetBlockRef()->vtx.size(), 3UL);
     // However if we advance height by 1 and time by 512, all of them should be
     // mined.
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
@@ -693,9 +703,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     chainActive.Tip()->nHeight++;
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
 
-    BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
-    BOOST_CHECK_EQUAL(pblocktemplate->block.vtx.size(), 5UL);
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK_EQUAL(pblocktemplate->GetBlockRef()->vtx.size(), 5UL);
 
     chainActive.Tip()->nHeight--;
     SetMockTime(0);
@@ -708,22 +717,29 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 
 void CheckBlockMaxSize(uint64_t size, uint64_t expected)
 {
-    gArgs.ForceSetArg("-blockmaxsize", std::to_string(size));
-    BlockAssembler ba(GlobalConfig::GetConfig());
-    BOOST_CHECK_EQUAL(ba.GetMaxGeneratedBlockSize(), expected);
+    GlobalConfig::GetConfig().SetMaxGeneratedBlockSize(size);
+    BlockAssemblerRef ba = CMiningFactory::GetAssembler(GlobalConfig::GetConfig());
+    BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expected);
 }
 
 BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
 {
     GlobalConfig& config = GlobalConfig::GetConfig();
 
+    // Make sure that default values are not overriden
+    BOOST_REQUIRE(!config.MaxGeneratedBlockSizeOverridden());
+    BOOST_REQUIRE(!config.MaxBlockSizeOverridden());
+
+    uint64_t nDefaultMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize();
+    uint64_t nDefaultMaxBlockSize = config.GetMaxBlockSize();
+
+
     // We are working on a fake chain and need to protect ourselves.
     LOCK(cs_main);
 
     // Test around historical 1MB (plus one byte because that's mandatory)
-    config.SetMaxBlockSize(ONE_MEGABYTE + 1);
-    config.SetMaxBlockSizeOverridden(false);
-    CheckBlockMaxSize(0, 1000);
+    BOOST_REQUIRE(config.SetMaxBlockSize(ONE_MEGABYTE + 1));
+    CheckBlockMaxSize(0, 1000); 
     CheckBlockMaxSize(1000, 1000);
     CheckBlockMaxSize(1001, 1001);
     CheckBlockMaxSize(12345, 12345);
@@ -733,84 +749,86 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
     CheckBlockMaxSize(ONE_MEGABYTE - 999, ONE_MEGABYTE - 999);
     CheckBlockMaxSize(ONE_MEGABYTE, ONE_MEGABYTE - 999);
 
-    // The maximum block size to be generated before the May 15, 2018 HF
-    // NOTE: We ought to remove these legacy May 15th activation tests when we
-    // do the general removal of the May 15th code, they're no longer relevant.
-    static const auto EIGHT_MEGABYTES = 8 * ONE_MEGABYTE;
-    auto LEGACY_CAP = EIGHT_MEGABYTES - 1000;
-
-    // Test around historical 8MB cap.
-    config.SetMaxBlockSize(EIGHT_MEGABYTES + 1);
-    config.SetMaxBlockSizeOverridden(false);
-    CheckBlockMaxSize(EIGHT_MEGABYTES - 1001, EIGHT_MEGABYTES - 1001);
-    CheckBlockMaxSize(EIGHT_MEGABYTES - 1000, LEGACY_CAP);
-    CheckBlockMaxSize(EIGHT_MEGABYTES - 999, LEGACY_CAP);
-    CheckBlockMaxSize(EIGHT_MEGABYTES, EIGHT_MEGABYTES - 1000);
-
     // Test around default cap
-    config.SetMaxBlockSize(DEFAULT_MAX_BLOCK_SIZE);
-    config.SetMaxBlockSizeOverridden(false);
-
-    // We are stuck at the legacy cap before activation.
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE, LEGACY_CAP);
-
-    // Activate May 15, 2018 HF the dirty way
-    const int64_t monolithTime =
-        config.GetChainParams().GetConsensus().monolithActivationTime;
-    auto pindex = chainActive.Tip();
-    for (size_t i = 0; pindex && i < 5; i++) {
-        BOOST_CHECK(!IsMonolithEnabled(config, chainActive.Tip()));
-        pindex->nTime = monolithTime;
-        pindex = pindex->pprev;
-    }
-    BOOST_CHECK(IsMonolithEnabled(config, chainActive.Tip()));
-
-    // Now cap is 32MB
-    static const auto THIRTY_TWO_MEGABYTES = 32 * ONE_MEGABYTE;
-    LEGACY_CAP = THIRTY_TWO_MEGABYTES - 1000;
-
-    // Test around historical 32MB cap.
-    config.SetMaxBlockSize(THIRTY_TWO_MEGABYTES + 1);
-    config.SetMaxBlockSizeOverridden(false);
-    CheckBlockMaxSize(THIRTY_TWO_MEGABYTES - 1001, THIRTY_TWO_MEGABYTES - 1001);
-    CheckBlockMaxSize(THIRTY_TWO_MEGABYTES - 1000, LEGACY_CAP);
-    CheckBlockMaxSize(THIRTY_TWO_MEGABYTES - 999, LEGACY_CAP);
-    CheckBlockMaxSize(THIRTY_TWO_MEGABYTES, THIRTY_TWO_MEGABYTES - 1000);
-
-    // Test around default cap
-    config.SetMaxBlockSize(DEFAULT_MAX_BLOCK_SIZE);
-    config.SetMaxBlockSizeOverridden(false);
-
-    // We are stuck at the legacy cap before activation.
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE, LEGACY_CAP);
-
-    // Activate Nov 15, 2018 HF the dirty way
-    const int64_t magneticTime =
-        config.GetChainParams().GetConsensus().magneticAnomalyActivationTime;
-    pindex = chainActive.Tip();
-    for (size_t i = 0; pindex && i < 5; i++) {
-        BOOST_CHECK(!IsMagneticEnabled(config, chainActive.Tip()));
-        pindex->nTime = magneticTime;
-        pindex = pindex->pprev;
-    }
-    BOOST_CHECK(IsMagneticEnabled(config, chainActive.Tip()));
+    BOOST_REQUIRE(config.SetMaxBlockSize(nDefaultMaxBlockSize));
 
     // Now we can use the default max block size.
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 1001, DEFAULT_MAX_BLOCK_SIZE - 1001);
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 1000, DEFAULT_MAX_BLOCK_SIZE - 1000);
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 999, DEFAULT_MAX_BLOCK_SIZE - 1000);
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE, DEFAULT_MAX_BLOCK_SIZE - 1000);
+    CheckBlockMaxSize(nDefaultMaxBlockSize - 1001, nDefaultMaxBlockSize - 1001);
+    CheckBlockMaxSize(nDefaultMaxBlockSize - 1000, nDefaultMaxBlockSize - 1000);
+    CheckBlockMaxSize(nDefaultMaxBlockSize - 999, nDefaultMaxBlockSize - 1000);
+    CheckBlockMaxSize(nDefaultMaxBlockSize, nDefaultMaxBlockSize - 1000);
 
     // If the parameter is not specified, we use
     // max(1K, min(DEFAULT_MAX_BLOCK_SIZE - 1K, DEFAULT_MAX_GENERATED_BLOCK_SIZE))
     {
         const auto expected { std::max(ONE_KILOBYTE,
-                                std::min(DEFAULT_MAX_BLOCK_SIZE - ONE_KILOBYTE,
-                                    DEFAULT_MAX_GENERATED_BLOCK_SIZE)) };
-        gArgs.ClearArg("-blockmaxsize");
-        BlockAssembler ba(config);
-        BOOST_CHECK_EQUAL(ba.GetMaxGeneratedBlockSize(), expected);
+                                std::min(nDefaultMaxBlockSize - ONE_KILOBYTE,
+                                    nDefaultMaxGeneratedBlockSize)) };
+        
+        // Set generated max size to default
+        config.SetMaxGeneratedBlockSize(nDefaultMaxGeneratedBlockSize);
+        BlockAssemblerRef ba = CMiningFactory::GetAssembler(config);
+        BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expected);
     }
+}
+
+void CheckBlockMaxSizeForTime(Config& config, uint64_t medianPastTime, uint64_t expectedSize)
+{
+    std::vector<CBlockIndex> blocks(11);
+
+    // Construct chain  with desired median time. Set time of each block to 
+    // the same value to get desired median past time.
+    CBlockIndex* pprev{ nullptr };
+    int height = 0;
+    for (auto& block : blocks)
+    {
+        block.nTime = medianPastTime;
+        block.pprev = pprev;
+        block.nHeight = height;
+
+        pprev = &block;
+        height++;
+    }
+
+
+    // Make sure that we got correct median past time.
+    BOOST_REQUIRE_EQUAL(blocks.back().GetMedianTimePast(), medianPastTime);
+
+    // chainActive is used by BlockAssembler to get median past time, which is used to select default block size
+    chainActive.SetTip(&blocks.back());
+
+    BlockAssemblerRef ba = CMiningFactory::GetAssembler(config);
+    BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expectedSize);
+
+
+    chainActive.SetTip(nullptr); // cleanup
+}
+
+BOOST_AUTO_TEST_CASE(BlockAssembler_construction_acttivate_new_blocksize)
+{
+    DefaultBlockSizeParams defaultParams{
+        // activation time 
+        1000,
+        // max block size before activation
+        5000,
+        // max block size after activation
+        6000,
+        // max generated block size before activation
+        3000,
+        // max generated block size after activation
+        4000
+    };
+
+    GlobalConfig config;
+    config.SetDefaultBlockSizeParams(defaultParams);
+
+    CheckBlockMaxSizeForTime(config, 999, 3000);
+    CheckBlockMaxSizeForTime(config, 1000, 4000);
+    CheckBlockMaxSizeForTime(config, 10001, 4000);
+
+    // When explicitly set, defaults values must not be used
+    config.SetMaxGeneratedBlockSize(3333);
+    CheckBlockMaxSizeForTime(config, 10001, 3333);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

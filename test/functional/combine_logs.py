@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Combine logs from multiple bitcoin nodes as well as the test_framework log.
 
 This streams the combined log output to stdout. Use combine_logs.py > outputfile
@@ -55,7 +57,7 @@ def read_logs(tmp_dir):
 
     files = [("test", "%s/test_framework.log" % tmp_dir)]
     for i in itertools.count():
-        logfile = "{}/node{}/regtest/debug.log".format(tmp_dir, i)
+        logfile = "{}/node{}/regtest/bitcoind.log".format(tmp_dir, i)
         if not os.path.isfile(logfile):
             break
         files.append(("node%d" % i, logfile))

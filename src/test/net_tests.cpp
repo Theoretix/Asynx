@@ -1,6 +1,7 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
+
 #include "addrman.h"
 #include "chainparams.h"
 #include "config.h"
@@ -181,6 +182,7 @@ BOOST_AUTO_TEST_CASE(test_getSubVersionEB) {
 
 BOOST_AUTO_TEST_CASE(test_userAgentLength) {
     GlobalConfig config;
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
     config.SetMaxBlockSize(8000000);
     std::string long_uacomment = "very very very very very very very very very "
@@ -194,12 +196,12 @@ BOOST_AUTO_TEST_CASE(test_userAgentLength) {
     gArgs.ForceSetMultiArg("-uacomment", long_uacomment);
 
     BOOST_CHECK_EQUAL(userAgent(config).size(), MAX_SUBVERSION_LENGTH);
-    BOOST_CHECK_EQUAL(userAgent(config),
-                      "/Asynx:0.1.0(EB8.0; very very very very very "
+    BOOST_CHECK(userAgent(config).find(
+                      "; very very very very very "
                       "very very very very very very very very very very very "
                       "very very very very very very very very very very very "
                       "very very very very very very very very very very very "
-                      "very very very very very very very very)/");
+                      "very very very very very very very very)/") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

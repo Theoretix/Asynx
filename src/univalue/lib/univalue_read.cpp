@@ -1,12 +1,13 @@
 // Copyright 2014 BitPay Inc.
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include <string.h>
 #include <vector>
 #include <stdio.h>
 #include "univalue.h"
 #include "univalue_utffilter.h"
+
 
 static bool json_isdigit(int ch)
 {
@@ -260,6 +261,10 @@ bool UniValue::read(const char *raw, size_t size)
     enum jtokentype tok = JTOK_NONE;
     enum jtokentype last_tok = JTOK_NONE;
     const char* end = raw + size;
+
+    int ObjArrCounter (0);
+
+
     do {
         last_tok = tok;
 
@@ -308,6 +313,12 @@ bool UniValue::read(const char *raw, size_t size)
         case JTOK_OBJ_OPEN:
         case JTOK_ARR_OPEN: {
             VType utyp = (tok == JTOK_OBJ_OPEN ? VOBJ : VARR);
+
+            if ( ObjArrCounter > m_JSONParseDepth ){
+                 fprintf (stderr, "JSON NESTING DEPTH exceed %d > %d\n",ObjArrCounter,m_JSONParseDepth);
+                 return false;
+            }
+
             if (!stack.size()) {
                 if (utyp == VOBJ)
                     setObject();
@@ -327,6 +338,10 @@ bool UniValue::read(const char *raw, size_t size)
                 setExpect(OBJ_NAME);
             else
                 setExpect(ARR_VALUE);
+
+
+            ++ ObjArrCounter ;
+
             break;
             }
 
@@ -343,6 +358,7 @@ bool UniValue::read(const char *raw, size_t size)
             stack.pop_back();
             clearExpect(OBJ_NAME);
             setExpect(NOT_VALUE);
+            --ObjArrCounter;
             break;
             }
 
@@ -446,4 +462,3 @@ bool UniValue::read(const char *raw, size_t size)
 
     return true;
 }
-

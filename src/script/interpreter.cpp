@@ -1,8 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2018 The Bitcoin SV developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2018-2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "interpreter.h"
 #include "script_flags.h"
@@ -351,35 +350,15 @@ static bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
             // Disabled opcodes.
             return true;
 
-        case OP_INVERT:
-        case OP_MUL:
-        case OP_LSHIFT:
-        case OP_RSHIFT:
-            // Opcodes that have been reenabled.
-            if ((flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) == 0) {
-                return true;
-            }
-            break;
-
-        case OP_CAT:
-        case OP_SPLIT:
-        case OP_AND:
-        case OP_OR:
-        case OP_XOR:
-        case OP_NUM2BIN:
-        case OP_BIN2NUM:
-        case OP_DIV:
-        case OP_MOD:
-            // Opcodes that have been reenabled.
-            if ((flags & SCRIPT_ENABLE_MONOLITH_OPCODES) == 0) {
-                return true;
-            }
-
         default:
             break;
     }
 
     return false;
+}
+
+inline bool IsValidMaxOpsPerScript(int nOpCount) {
+    return (nOpCount <= MAX_OPS_PER_SCRIPT);
 }
 
 bool EvalScript(std::vector<valtype> &stack, const CScript &script,
@@ -403,7 +382,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
     }
     int nOpCount = 0;
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
-    bool isMagnetic = (flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) != 0;
 
     try {
         while (pc < pend) {
@@ -419,8 +397,12 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
             }
 
+            //
+            // Check opcode limits.
+            //
+            // Push values are not taken into consideration.
             // Note how OP_RESERVED does not count towards the opcode limit.
-            if (!isMagnetic && opcode > OP_16 && ++nOpCount > MAX_OPS_PER_SCRIPT) {
+            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(++nOpCount)) {
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
             }
 
@@ -1264,7 +1246,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
                         }
                         nOpCount += nKeysCount;
-                        if (!isMagnetic && nOpCount > MAX_OPS_PER_SCRIPT) {
+                        if (!IsValidMaxOpsPerScript(nOpCount)) {
                             return set_error(serror, SCRIPT_ERR_OP_COUNT);
                         }
                         int ikey = ++i;
@@ -1501,6 +1483,10 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                 return set_error(serror, SCRIPT_ERR_STACK_SIZE);
             }
         }
+    } catch (scriptnum_overflow_error& err) {
+        return set_error(serror, SCRIPT_ERR_SCRIPTNUM_OVERFLOW);
+    } catch (scriptnum_minencode_error& err) {
+        return set_error(serror, SCRIPT_ERR_SCRIPTNUM_MINENCODE);
     } catch (...) {
         return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
     }
@@ -1664,14 +1650,6 @@ uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
                       unsigned int nIn, SigHashType sigHashType,
                       const Amount amount,
                       const PrecomputedTransactionData *cache, uint32_t flags) {
-    if (flags & SCRIPT_ENABLE_REPLAY_PROTECTION) {
-        // Legacy chain's value for fork id must be of the form 0xffxxxx.
-        // By xoring with 0xdead, we ensure that the value will be different
-        // from the original one, even if it already starts with 0xff.
-        uint32_t newForkValue = sigHashType.getForkValue() ^ 0xdead;
-        sigHashType = sigHashType.withForkValue(0xff0000 | newForkValue);
-    }
-
     if (sigHashType.hasForkId() && (flags & SCRIPT_ENABLE_SIGHASH_FORKID)) {
         uint256 hashPrevouts;
         uint256 hashSequence;

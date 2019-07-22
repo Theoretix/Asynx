@@ -1,8 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2018 The Asynx developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
@@ -18,11 +17,12 @@
 #include "compat/sanity.h"
 #include "config.h"
 #include "consensus/validation.h"
+#include "consensus/consensus.h"
 #include "fs.h"
 #include "httprpc.h"
 #include "httpserver.h"
 #include "key.h"
-#include "miner.h"
+#include "mining/legacy.h"
 #include "net.h"
 #include "net_processing.h"
 #include "netbase.h"
@@ -42,6 +42,8 @@
 #include "utilmoneystr.h"
 #include "validation.h"
 #include "validationinterface.h"
+#include "vmtouch.h"
+
 #ifdef ENABLE_WALLET
 #include "wallet/rpcdump.h"
 #include "wallet/wallet.h"
@@ -108,7 +110,7 @@ static const char *FEE_ESTIMATES_FILENAME = "fee_estimates.dat";
 // Thread management and startup/shutdown:
 //
 // The network-processing threads are all part of a thread group created by
-// AppInit() or the Qt main() function.
+// AppInit() function.
 //
 // A clean exit happens when StartShutdown() or the SIGTERM signal handler sets
 // fRequestShutdown, which triggers the DetectShutdownThread(), which interrupts
@@ -120,9 +122,6 @@ static const char *FEE_ESTIMATES_FILENAME = "fee_estimates.dat";
 // Note that if running -daemon the parent process returns from AppInit2 before
 // adding any threads to the threadGroup, so .join_all() returns immediately and
 // the parent exits from main().
-//
-// Shutdown for Qt is very similar, only it uses a QTimer to detect
-// fRequestShutdown getting set, and then does the normal Qt shutdown thing.
 //
 
 std::atomic<bool> fRequestShutdown(false);
@@ -138,7 +137,7 @@ bool ShutdownRequested() {
 /**
  * This is a minimally invasive approach to shutdown on LevelDB read errors from
  * the chainstate, while keeping user interface out of the common library, which
- * is shared between bitcoind, and bitcoin-qt and non-server tools.
+ * is shared between bitcoind and non-server tools.
  */
 class CCoinsViewErrorCatcher final : public CCoinsViewBacked {
 public:
@@ -425,6 +424,14 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-pid=<file>",
         strprintf(_("Specify pid file (default: %s)"), BITCOIN_PID_FILENAME));
 #endif
+
+    strUsage += HelpMessageOpt(
+        "-preload=<n>",
+            _("If n is set to 1, blockchain state will be preloaded into memory. If n is 0, no preload will happen. "
+              "Other values for n are not allowed. The default value is 0."
+              " This option is not supported on Windows operating systems.")
+            );
+
     strUsage += HelpMessageOpt(
         "-prune=<n>",
         strprintf(
@@ -445,6 +452,9 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage +=
         HelpMessageOpt("-reindex", _("Rebuild chain state and block index from "
                                      "the blk*.dat files on disk"));
+    strUsage +=
+        HelpMessageOpt("-rejectmempoolrequest", _("Reject every mempool request from "
+                                     "non-whitelisted peers."));
 #ifndef WIN32
     strUsage += HelpMessageOpt(
         "-sysperms",
@@ -455,14 +465,14 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-txindex", strprintf(_("Maintain a full transaction index, used by "
                                 "the getrawtransaction rpc call (default: %d)"),
                               DEFAULT_TXINDEX));
-    strUsage += HelpMessageOpt(
-        "-usecashaddr", _("Use Cash Address for destination encoding instead "
-                          "of base58 (activate by default on Jan, 14)"));
-
     strUsage += HelpMessageGroup(_("Connection options:"));
     strUsage += HelpMessageOpt(
         "-addnode=<ip>",
         _("Add a node to connect to and attempt to keep the connection open"));
+    if (showDebug) {
+        strUsage += HelpMessageOpt("-allowunsolicitedaddr",
+            _("Allow inbound peers to send us unsolicted addr messages"));
+    }
     strUsage += HelpMessageOpt(
         "-banscore=<n>",
         strprintf(
@@ -517,11 +527,23 @@ std::string HelpMessage(HelpMessageMode mode) {
                                           "<n>*1000 bytes (default: %u)"),
                                         DEFAULT_MAXSENDBUFFER));
     strUsage += HelpMessageOpt(
+        "-factorMaxSendQueuesBytes=<n>",
+        strprintf(_("Factor that will be multiplied with excessiveBlockSize"
+            " to limit the maximum bytes in all sending queues. If this"
+            " size is exceeded, no response to block related P2P messages is sent."
+            " (default factor: %u)"),
+            DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES));
+    strUsage += HelpMessageOpt(
         "-maxtimeadjustment",
         strprintf(_("Maximum allowed median peer time offset adjustment. Local "
                     "perspective of time may be influenced by peers forward or "
                     "backward by this amount. (default: %u seconds)"),
                   DEFAULT_MAX_TIME_ADJUSTMENT));
+    strUsage += HelpMessageOpt(
+        "-broadcastdelay=<n>",
+        strprintf(
+            _("Set inventory broadcast delay duration in millisecond(min: %d, max: %d)"),
+            0,MAX_INV_BROADCAST_DELAY));
     strUsage +=
         HelpMessageOpt("-onion=<ip:port>",
                        strprintf(_("Use separate SOCKS5 proxy to reach peers "
@@ -737,6 +759,9 @@ std::string HelpMessage(HelpMessageMode mode) {
             "-mocktime=<n>",
             "Replace actual time with <n> seconds since epoch (default: 0)");
         strUsage += HelpMessageOpt(
+            "-blocksizeactivationtime=<n>",
+            "Change time that specifies when new defaults for excessiveblocksize and -blockmaxsize are used");
+        strUsage += HelpMessageOpt(
             "-limitfreerelay=<n>",
             strprintf("Continuously rate-limit free transactions to <n>*1000 "
                       "bytes per minute (default: %u)",
@@ -779,7 +804,7 @@ std::string HelpMessage(HelpMessageMode mode) {
                   CURRENCY_UNIT, FormatMoney(DEFAULT_TRANSACTION_MAXFEE)));
     strUsage += HelpMessageOpt(
         "-printtoconsole",
-        _("Send trace/debug info to console instead of debug.log file"));
+        _("Send trace/debug info to console instead of bitcoind.log file"));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-printpriority", strprintf("Log transaction priority and fee per "
@@ -787,7 +812,7 @@ std::string HelpMessage(HelpMessageMode mode) {
                                         DEFAULT_PRINTPRIORITY));
     }
     strUsage += HelpMessageOpt("-shrinkdebugfile",
-                               _("Shrink debug.log file on client startup "
+                               _("Shrink bitcoind.log file on client startup "
                                  "(default: 1 when no -debug)"));
 
     AppendParamsHelpMessages(strUsage, showDebug);
@@ -797,8 +822,16 @@ std::string HelpMessage(HelpMessageMode mode) {
         HelpMessageOpt("-excessiveblocksize=<n>",
                        strprintf(_("Set the maximum block size in bytes we will accept "
                                    "from any source. This is the effective block size "
-                                   "hard limit (default: %d)"),
-                                 DEFAULT_MAX_BLOCK_SIZE));
+                                   "hard limit  If not specified, the following defaults are used : "
+                                   "Mainnet: %d before %s and %d after, "
+                                   "Testnet: %d before %s and %d after."),
+                                    defaultChainParams->GetDefaultBlockSizeParams().maxBlockSizeBefore,
+                                    DateTimeStrFormat("%Y-%m-%d %H:%M:%S", defaultChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
+                                    defaultChainParams->GetDefaultBlockSizeParams().maxBlockSizeAfter,
+                                    testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeBefore,
+                                    DateTimeStrFormat("%Y-%m-%d %H:%M:%S", testnetChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
+                                    testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeAfter
+                                 ));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-acceptnonstdtxn",
@@ -826,15 +859,23 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-datacarriersize",
         strprintf(_("Maximum size of data in data carrier transactions we "
                     "relay and mine (default: %u)"),
-                  MAX_OP_RETURN_RELAY));
+                  DEFAULT_DATA_CARRIER_SIZE));
 
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
         "-blockmaxsize=<n>",
-        strprintf(_("Set maximum block size in bytes we will mine (default: %d). "
+        strprintf(_("Set maximum block size in bytes we will mine. "
                     "Must be less than or equal the hard maximum block size limit "
-                    "as set by -excessiveblocksize"),
-                  DEFAULT_MAX_GENERATED_BLOCK_SIZE));
+                    "as set by -excessiveblocksize. If not specified, the following defaults are used: "
+                    "Mainnet: %d before %s and %d after, "
+                    "Testnet: %d before %s and %d after."),
+                    defaultChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeBefore,
+                    DateTimeStrFormat("%Y-%m-%d %H:%M:%S", defaultChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
+                    defaultChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter,
+                    testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeBefore,
+                    DateTimeStrFormat("%Y-%m-%d %H:%M:%S", testnetChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
+                    testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter
+                    ));
     strUsage += HelpMessageOpt(
         "-blockprioritypercentage=<n>",
         strprintf(_("Set maximum percentage of a block reserved to "
@@ -849,6 +890,10 @@ std::string HelpMessage(HelpMessageMode mode) {
         strUsage +=
             HelpMessageOpt("-blockversion=<n>",
                            "Override block version to test forking scenarios");
+        strUsage +=
+            HelpMessageOpt("-blockcandidatevaliditytest",
+                           strprintf(_("Perform validity test on block candidates. Defaults: "
+                           "Mainnet: %d, Testnet: %d"), defaultChainParams->TestBlockCandidateValidity(), testnetChainParams->TestBlockCandidateValidity()));
     }
 
     strUsage += HelpMessageGroup(_("RPC server options:"));
@@ -889,6 +934,11 @@ std::string HelpMessage(HelpMessageMode mode) {
           "1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24). This "
           "option can be specified multiple times"));
     strUsage += HelpMessageOpt(
+        "-magicbytes=<hexcode>",
+        _("Allow users to split the test net by changing the magicbytes. "
+          "This option only work on a network different than mainnet. "
+          "default : 0f0f0f0f"));
+    strUsage += HelpMessageOpt(
         "-rpcthreads=<n>",
         strprintf(
             _("Set the number of threads to service RPC calls (default: %d)"),
@@ -906,14 +956,33 @@ std::string HelpMessage(HelpMessageMode mode) {
             strprintf("Timeout during HTTP requests (default: %d)",
                       DEFAULT_HTTP_SERVER_TIMEOUT));
     }
+     strUsage += HelpMessageOpt(
+        "-invalidcsinterval=<n>",
+         strprintf("Set the time limit on the reception of invalid message checksums from a single node in milliseconds (default: %dms)",
+            DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS)) ;
+
+         strUsage += HelpMessageOpt(
+        "-invalidcsfreq=<n>",
+         strprintf("Set the limit on the number of invalid checksums received over a given time period from a single node  (default: %d)",
+            DEFAULT_INVALID_CHECKSUM_FREQUENCY)) ;
+
+    strUsage += HelpMessageOpt(
+        "-invalidheaderinterval=<n>",
+         strprintf("Set the time limit on the transmission of message headers from the local node in milliseconds (default: %dms)",
+            DEFAULT_MIN_TIME_INTERVAL_HEADER_MS)) ;
+
+    strUsage += HelpMessageOpt(
+        "-invalidheaderfreq=<n>",
+         strprintf("Set the limit on the number of message headers transmitted from the local node over a given time period (default: %d)",
+           DEFAULT_INVALID_HEADER_FREQUENCY)) ;
 
     return strUsage;
 }
 
 std::string LicenseInfo() {
     const std::string URL_SOURCE_CODE =
-        "<https://github.com/Theoretix/Asynx>";
-    const std::string URL_WEBSITE = "<https://asynx.io>";
+        "<https://github.com/bitcoin-sv/bitcoin-sv>";
+    const std::string URL_WEBSITE = "<https://bitcoinsv.io>";
 
     return CopyrightHolders(
                strprintf(_("Copyright (C) %i-%i"), 2009, COPYRIGHT_YEAR) +
@@ -925,9 +994,9 @@ std::string LicenseInfo() {
            "\n" + strprintf(_("The source code is available from %s."),
                             URL_SOURCE_CODE) +
            "\n" + "\n" + _("This is experimental software.") + "\n" +
-           strprintf(_("Distributed under the MIT software license, see the "
-                       "accompanying file %s or %s"),
-                     "COPYING", "<https://opensource.org/licenses/MIT>") +
+           strprintf(_("Distributed under the Open BSV software license, see the "
+                       "accompanying file %s"),
+                     "LICENSE") +
            "\n" + "\n" +
            strprintf(_("This product includes software developed by the "
                        "OpenSSL Project for use in the OpenSSL Toolkit %s and "
@@ -1024,29 +1093,7 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles) {
 
         // -reindex
         if (fReindex) {
-            int nFile = 0;
-            while (true) {
-                CDiskBlockPos pos(nFile, 0);
-                if (!fs::exists(GetBlockPosFilename(pos, "blk"))) {
-                    // No block files left to reindex
-                    break;
-                }
-                FILE *file = OpenBlockFile(pos, true);
-                if (!file) {
-                    // This error is logged in OpenBlockFile
-                    break;
-                }
-                LogPrintf("Reindexing block file blk%05u.dat...\n",
-                          (unsigned int)nFile);
-                LoadExternalBlockFile(config, file, &pos);
-                nFile++;
-            }
-            pblocktree->WriteReindexing(false);
-            fReindex = false;
-            LogPrintf("Reindexing finished\n");
-            // To avoid ending up in a situation without genesis block, re-try
-            // initializing (no-op if reindexing worked):
-            InitBlockIndex(config);
+            ReindexAllBlockFiles(config, pblocktree, fReindex);
         }
 
         // hardcoded $DATADIR/bootstrap.dat
@@ -1308,7 +1355,7 @@ bool AppInitBasicSetup() {
     sigaction(SIGTERM, &sa, nullptr);
     sigaction(SIGINT, &sa, nullptr);
 
-    // Reopen debug.log on SIGHUP
+    // Reopen bitcoind.log on SIGHUP
     struct sigaction sa_hup;
     sa_hup.sa_handler = HandleSIGHUP;
     sigemptyset(&sa_hup.sa_mask);
@@ -1478,9 +1525,7 @@ bool AppInitParameterInteraction(Config &config) {
     // mempool limits
     int64_t nMempoolSizeMax =
         gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
-    int64_t nMempoolSizeMin =
-        gArgs.GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) *
-        1000 * 40;
+    int64_t nMempoolSizeMin = nMempoolSizeMax * 0.3;
     if (nMempoolSizeMax < 0 || nMempoolSizeMax < nMempoolSizeMin)
         return InitError(strprintf(_("-maxmempool must be at least %d MB"),
                                    std::ceil(nMempoolSizeMin / 1000000.0)));
@@ -1493,26 +1538,73 @@ bool AppInitParameterInteraction(Config &config) {
     else if (nScriptCheckThreads > MAX_SCRIPTCHECK_THREADS)
         nScriptCheckThreads = MAX_SCRIPTCHECK_THREADS;
 
+    // Configure preferred size of blockfile.
+    config.SetPreferredBlockFileSize(
+        gArgs.GetArg("-preferredblockfilesize",
+            DEFAULT_PREFERRED_BLOCKFILE_SIZE));
+
     // Configure excessive block size.
     if(gArgs.IsArgSet("-excessiveblocksize")) {
         const uint64_t nProposedExcessiveBlockSize =
-            gArgs.GetArg("-excessiveblocksize", DEFAULT_MAX_BLOCK_SIZE);
+            gArgs.GetArg("-excessiveblocksize", 0 /*not used*/ );
         if (!config.SetMaxBlockSize(nProposedExcessiveBlockSize)) {
-            return InitError(strprintf(_(
-                "Excessive block size must be > %d and less than the "
-                "max block file size (%d)"),
-                LEGACY_MAX_BLOCK_SIZE, MAX_BLOCKFILE_SIZE - BLOCKFILE_BLOCK_HEADER_SIZE
+            return InitError(strprintf(
+                _("Excessive block size must be > %d"),
+                LEGACY_MAX_BLOCK_SIZE
             ));
         }
     }
 
-    // Check blockmaxsize does not exceed maximum accepted block size.
-    const uint64_t nProposedMaxGeneratedBlockSize =
-        gArgs.GetArg("-blockmaxsize", DEFAULT_MAX_GENERATED_BLOCK_SIZE);
-    if (nProposedMaxGeneratedBlockSize > config.GetMaxBlockSize()) {
-        auto msg = _("Max generated block size (blockmaxsize) cannot exceed "
-                     "the excessive block size (excessiveblocksize)");
-        return InitError(msg);
+    if(gArgs.IsArgSet("-factorMaxSendQueuesBytes")) {
+        const uint64_t factorMaxSendQueuesBytes = gArgs.GetArg("-factorMaxSendQueuesBytes", DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES);
+        config.SetFactorMaxSendQueuesBytes(factorMaxSendQueuesBytes);
+    }
+
+    // Configure max generated block size.
+    if(gArgs.IsArgSet("-blockmaxsize")) {
+        const uint64_t nProposedMaxGeneratedBlockSize =
+            gArgs.GetArg("-blockmaxsize", 0 /* not used*/);
+        if (!config.SetMaxGeneratedBlockSize(nProposedMaxGeneratedBlockSize)) {
+            auto msg = _("Max generated block size (blockmaxsize) cannot exceed "
+                "the excessive block size (excessiveblocksize)");
+            return InitError(msg);
+        }
+    }
+
+    // Configure block size related activation time
+    if(gArgs.IsArgSet("-blocksizeactivationtime")) {
+        const int64_t nProposedActivationTime =
+            gArgs.GetArg("-blocksizeactivationtime", 0);
+        config.SetBlockSizeActivationTime(nProposedActivationTime);
+    }
+
+    // Configure whether to run extra block candidate validity checks
+    config.SetTestBlockCandidateValidity(
+        gArgs.GetBoolArg("-blockcandidatevaliditytest", chainparams.TestBlockCandidateValidity()));
+
+    // Configure data carrier size.
+    if(gArgs.IsArgSet("-datacarriersize")) {
+        config.SetDataCarrierSize(gArgs.GetArg("-datacarriersize", DEFAULT_DATA_CARRIER_SIZE));
+    }
+
+    // Configure descendant limit count.
+    if(gArgs.IsArgSet("-limitdescendantcount")) {
+        config.SetLimitDescendantCount(gArgs.GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT));
+    }
+
+    // Configure ancestor limit count.
+    if(gArgs.IsArgSet("-limitancestorcount")) {
+        config.SetLimitAncestorCount(gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT));
+    }
+
+    // Configure descendant limit size.
+    if(gArgs.IsArgSet("-limitdescendantsize")) {
+        config.SetLimitDescendantSize(gArgs.GetArg("-limitdescendantsize", (MAX_TX_SIZE * config.GetLimitDescendantCount()) / 1000) * 1000);
+    }
+
+    // Configure ancestor limit size.
+    if(gArgs.IsArgSet("-limitancestorsize")) {
+        config.SetLimitAncestorSize(gArgs.GetArg("-limitancestorsize", (MAX_TX_SIZE * config.GetLimitAncestorCount()) / 1000) * 1000);
     }
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &
@@ -1728,6 +1820,70 @@ bool AppInitSanityChecks() {
     return LockDataDirectory(true);
 }
 
+void preloadChainStateThreadFunction()
+{
+#ifndef WIN32
+    auto path = boost::filesystem::canonical(GetDataDir() / "chainstate").string();
+    LogPrintf("Preload started\n");
+    try {
+        auto start = std::chrono::system_clock::now();
+        VMTouch vm;
+
+        vm.vmtouch_touch(path);
+
+        auto end = std::chrono::system_clock::now();
+
+        int64_t elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+        auto& warnings = vm.get_warnings();
+        if (!warnings.empty())
+        {
+            LogPrintf("Warnings occured during chainstate preload\n:");
+            for(auto& warning : warnings)
+            {
+                LogPrintf("Preload warning:  %s \n", warning.c_str());
+            }
+        }
+        LogPrintf("Preload finished in %" PRId64 " [ms]. Preloaded %" PRId64 " MB of data (%d %% were already present in memory)\n",
+            elapsed, vm.total_pages*vm.pagesize/ONE_MEGABYTE, (int) vm.getPagesInCorePercent());
+
+        // verify that pages were not evicted
+        VMTouch vm2;
+        int stillLoadedPercent = (int) vm2.vmtouch_check(path);
+
+        if (stillLoadedPercent < 90) {
+            LogPrintf("WARNING: Only %d %% of data still present in memory after preloading. Increae amount of free RAM to get the benefits of preloading\n", stillLoadedPercent);
+        }
+
+    }   catch(const std::runtime_error& ex) {
+        LogPrintf("Error while preloading chain state: %s\n", ex.what());
+    }
+
+#else
+    LogPrintf("Preload is not supported on this platform!");
+    return;
+#endif
+}
+
+void preloadChainState(boost::thread_group &threadGroup)
+{
+    int64_t preload;
+    preload = gArgs.GetArg("-preload", 0);
+    if (preload == 0)
+    {
+        LogPrintf("Chainstate will NOT be preloaded\n");
+        return;
+    }
+
+    if (preload == 1 )// preload with vmtouch
+    {
+        threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "preload", preloadChainStateThreadFunction));
+    }
+    else
+    {
+        LogPrintf("Unknown value of -preload. No preloading will be done\n");
+    }
+}
+
 bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                  CScheduler &scheduler) {
     const CChainParams &chainparams = config.GetChainParams();
@@ -1750,8 +1906,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 
     bool default_shrinkdebugfile = logger.DefaultShrinkDebugFile();
     if (gArgs.GetBoolArg("-shrinkdebugfile", default_shrinkdebugfile)) {
-        // Do this first since it both loads a bunch of debug.log into memory,
-        // and because this needs to happen before any other debug.log printing.
+        // Do this first since it both loads a bunch of bitcoind.log into memory,
+        // and because this needs to happen before any other bitcoind.log printing.
         logger.ShrinkDebugFile();
     }
 
@@ -1802,7 +1958,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
         }
     }
 
-    int64_t nStart;
+    int64_t nStart=0;
 
 // Step 5: verify wallet database integrity
 #ifdef ENABLE_WALLET
@@ -1824,6 +1980,12 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     CConnman &connman = *g_connman;
 
     peerLogic.reset(new PeerLogicValidation(&connman));
+    if (gArgs.IsArgSet("-broadcastdelay")) {
+        const int64_t nDelayMillisecs = gArgs.GetArg("-broadcastdelay", DEFAULT_INV_BROADCAST_DELAY);
+        if(!SetInvBroadcastDelay(nDelayMillisecs)){
+            return InitError(strprintf(_("Error setting broadcastdelay=%d"), nDelayMillisecs));
+        }
+    }
     RegisterValidationInterface(peerLogic.get());
     RegisterNodeSignals(GetNodeSignals());
 
@@ -2181,8 +2343,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
         }
     }
 
-    // As LoadBlockIndex can take several minutes, it's possible the user
-    // requested to kill the GUI during the last operation. If so, exit.
+    // As LoadBlockIndex can take several minutes.
     // As the program has not fully started yet, Shutdown() is possibly
     // overkill.
     if (fRequestShutdown) {
@@ -2197,11 +2358,6 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // Allowed to fail as this file IS missing on first startup.
     if (!est_filein.IsNull()) mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
-
-    // Encoded addresses using cashaddr instead of base58
-    // Activates by default on Jan, 14
-    config.SetCashAddrEncoding(
-        gArgs.GetBoolArg("-usecashaddr", GetAdjustedTime() > 1515900000));
 
 // Step 8: load wallet
 #ifdef ENABLE_WALLET
@@ -2261,6 +2417,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
         uiInterface.NotifyBlockTip.disconnect(BlockNotifyGenesisWait);
     }
 
+    preloadChainState(threadGroup);
+
     // Step 11: start node
 
     //// debug print
@@ -2301,6 +2459,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // Step 12: finished
 
     SetRPCWarmupFinished();
+
     uiInterface.InitMessage(_("Done loading"));
 
 #ifdef ENABLE_WALLET

@@ -1,9 +1,8 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2017-2018 The Bitcoin developers
-// Copyright (c) 2018 The Bitcoin SV developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2018-2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_SCRIPT_SCRIPTFLAGS_H
 #define BITCOIN_SCRIPT_SCRIPTFLAGS_H
@@ -92,17 +91,6 @@ enum {
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
 
-    // Do we accept activate replay protection using a different fork id.
-    //
-    SCRIPT_ENABLE_REPLAY_PROTECTION = (1U << 17),
-
-    // Enable new opcodes.
-    //
-    SCRIPT_ENABLE_MONOLITH_OPCODES = (1U << 18),
-
-    // Are the Magnetic upgrade opcodes enabled?
-    //
-    SCRIPT_ENABLE_MAGNETIC_OPCODES = (1U << 19),
 };
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H

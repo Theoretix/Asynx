@@ -1,6 +1,6 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "test_bitcoin.h"
 
@@ -12,7 +12,7 @@
 #include "fs.h"
 #include "key.h"
 #include "logging.h"
-#include "miner.h"
+#include "mining/factory.h"
 #include "net_processing.h"
 #include "pubkey.h"
 #include "random.h"
@@ -50,16 +50,13 @@ BasicTestingSetup::BasicTestingSetup(const std::string &chainName) {
     InitSignatureCache();
     InitScriptExecutionCache();
 
-    // Don't want to write to debug.log file.
+    // Don't want to write to bitcoind.log file.
     GetLogger().fPrintToDebugLog = false;
 
     fCheckBlockIndex = true;
     SelectParams(chainName);
     noui_connect();
 
-    // Set config parameters to default.
-    GlobalConfig config;
-    config.SetMaxBlockSize(DEFAULT_MAX_BLOCK_SIZE);
 }
 
 BasicTestingSetup::~BasicTestingSetup() {
@@ -72,7 +69,9 @@ TestingSetup::TestingSetup(const std::string &chainName)
 
     // Ideally we'd move all the RPC tests to the functional testing framework
     // instead of unit tests, but for now we need these here.
-    const Config &config = GlobalConfig::GetConfig();
+    GlobalConfig &config = GlobalConfig::GetConfig();
+    config.Reset(); // make sure that we start every test with a clean config
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     RegisterAllRPCCommands(tableRPC);
     ClearDatadirCache();
     pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i",
@@ -135,9 +134,11 @@ TestChain100Setup::TestChain100Setup()
 CBlock TestChain100Setup::CreateAndProcessBlock(
     const std::vector<CMutableTransaction> &txns, const CScript &scriptPubKey) {
     const Config &config = GlobalConfig::GetConfig();
+    CBlockIndex* pindexPrev {nullptr};
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-        BlockAssembler(config).CreateNewBlock(scriptPubKey);
-    CBlock &block = pblocktemplate->block;
+            CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
+    CBlockRef blockRef = pblocktemplate->GetBlockRef();
+    CBlock &block = *blockRef;
 
     // Replace mempool-selected txns with just coinbase plus passed-in txns:
     block.vtx.resize(1);
@@ -146,7 +147,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     }
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
     unsigned int extraNonce = 0;
-    IncrementExtraNonce(config, &block, chainActive.Tip(), extraNonce);
+    IncrementExtraNonce(config, &block, pindexPrev, extraNonce);
 
     while (!CheckProofOfWork(block.GetHash(), block.nBits, config)) {
         ++block.nNonce;

@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "policy/fees.h"
 #include "policy/policy.h"
@@ -381,7 +381,7 @@ void CBlockPolicyEstimator::processTransaction(const CTxMemPoolEntry &entry,
     }
     trackedTxs++;
 
-    // Feerates are stored and reported as BCH-per-kb:
+    // Feerates are stored and reported as BSV-per-kb:
     CFeeRate feeRate(entry.GetFee(), entry.GetTxSize());
 
     mapMemPoolTxs[txid].blockHeight = txHeight;
@@ -409,7 +409,7 @@ bool CBlockPolicyEstimator::processBlockTx(unsigned int nBlockHeight,
         return false;
     }
 
-    // Feerates are stored and reported as BCH-per-kb:
+    // Feerates are stored and reported as BSV-per-kb:
     CFeeRate feeRate(entry->GetFee(), entry->GetTxSize());
 
     feeStats.Record(blocksToConfirm,

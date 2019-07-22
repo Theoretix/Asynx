@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2017 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """An example functional test
 
 The module-level docstring should include a high-level description of
@@ -52,6 +52,10 @@ class BaseNode(NodeConnCB):
         super().__init__()
         # Stores a dictionary of all blocks received
         self.block_receive_map = defaultdict(int)
+
+    def on_inv(self, conn, message):
+        """Ignore inv messages"""
+        pass
 
     def on_block(self, conn, message):
         """Override the standard on_block callback
@@ -206,10 +210,10 @@ class ExampleTest(BitcoinTestFramework):
         self.log.info(
             "Wait for node2 reach current tip. Test that it has propagated all the blocks to us")
 
+        getdata_request = msg_getdata()
         for block in blocks:
-            getdata_request = msg_getdata()
             getdata_request.inv.append(CInv(2, block))
-            node2.send_message(getdata_request)
+        node2.send_message(getdata_request)
 
         # wait_until() will loop until a predicate condition is met. Use it to test properties of the
         # NodeConnCB objects.

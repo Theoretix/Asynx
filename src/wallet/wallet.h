@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_WALLET_WALLET_H
 #define BITCOIN_WALLET_WALLET_H
@@ -29,6 +29,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <random>
 
 typedef CWallet *CWalletRef;
 extern std::vector<CWalletRef> vpwallets;
@@ -594,6 +595,7 @@ class CWallet final : public CCryptoKeyStore, public CValidationInterface {
 private:
     static std::atomic<bool> fFlushScheduled;
 
+    mutable std::mt19937 randomNumbers;
     /**
      * Select a set of coins such that nValueRet >= nTargetValue and at least
      * all coins from coinControl are selected; Never select unconfirmed coins
@@ -710,14 +712,14 @@ public:
 
     // Create wallet with dummy database handle
     CWallet(const CChainParams &chainParams)
-        : dbw(new CWalletDBWrapper()), chainParams(chainParams) {
+        : randomNumbers(std::random_device{}()), dbw(new CWalletDBWrapper()), chainParams(chainParams) {
         SetNull();
     }
 
     // Create wallet with passed-in database handle
     CWallet(const CChainParams &chainParams,
             std::unique_ptr<CWalletDBWrapper> dbw_in)
-        : dbw(std::move(dbw_in)), chainParams(chainParams) {
+        : randomNumbers(std::random_device{}()), dbw(std::move(dbw_in)), chainParams(chainParams) {
         SetNull();
     }
 
@@ -1024,7 +1026,7 @@ public:
         }
     }
 
-    void GetScriptForMining(std::shared_ptr<CReserveScript> &script);
+    void GetScriptForMining(std::shared_ptr<CReserveScript> &script) override;
 
     unsigned int GetKeyPoolSize() {
         // set{Ex,In}ternalKeyPool
@@ -1082,10 +1084,6 @@ public:
     boost::signals2::signal<void(CWallet *wallet, const uint256 &hashTx,
                                  ChangeType status)>
         NotifyTransactionChanged;
-
-    /** Show progress e.g. for rescan */
-    boost::signals2::signal<void(const std::string &title, int nProgress)>
-        ShowProgress;
 
     /** Watch-only address added */
     boost::signals2::signal<void(bool fHaveWatchOnly)> NotifyWatchonlyChanged;

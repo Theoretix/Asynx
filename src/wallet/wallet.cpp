@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "wallet/wallet.h"
 
@@ -1721,25 +1721,8 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
         pindex = chainActive.Next(pindex);
     }
 
-    // Show rescan progress in GUI as dialog or on splashscreen, if -rescan on
-    // startup.
-    ShowProgress(_("Rescanning..."), 0);
-    double dProgressStart =
-        GuessVerificationProgress(chainParams.TxData(), pindex);
-    double dProgressTip =
-        GuessVerificationProgress(chainParams.TxData(), chainActive.Tip());
     while (pindex) {
-        if (pindex->nHeight % 100 == 0 && dProgressTip - dProgressStart > 0.0) {
-            ShowProgress(
-                _("Rescanning..."),
-                std::max(1,
-                         std::min(99, (int)((GuessVerificationProgress(
-                                                 chainParams.TxData(), pindex) -
-                                             dProgressStart) /
-                                            (dProgressTip - dProgressStart) *
-                                            100))));
-        }
-
+        
         CBlock block;
         if (ReadBlockFromDisk(block, pindex, GlobalConfig::GetConfig())) {
             for (size_t posInBlock = 0; posInBlock < block.vtx.size();
@@ -1762,9 +1745,6 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
                       GuessVerificationProgress(chainParams.TxData(), pindex));
         }
     }
-
-    // Hide progress dialog in GUI.
-    ShowProgress(_("Rescanning..."), 100);
 
     return ret;
 }
@@ -1814,9 +1794,9 @@ bool CWalletTx::RelayWalletTransaction(CConnman *connman) {
     if (InMempool() || AcceptToMemoryPool(maxTxFee, state)) {
         LogPrintf("Relaying wtx %s\n", GetId().ToString());
         if (connman) {
-            CInv inv(MSG_TX, GetId());
-            connman->ForEachNode(
-                [&inv](CNode *pnode) { pnode->PushInventory(inv); });
+            CInv inv { MSG_TX, GetId() };
+            TxMempoolInfo txinfo { mempool.info(GetId()) };
+            connman->EnqueueTransaction( {inv, txinfo} );
             return true;
         }
     }
@@ -2397,9 +2377,9 @@ bool CWallet::SelectCoinsMinConf(
     std::vector<std::pair<Amount, std::pair<const CWalletTx *, unsigned int>>>
         vValue;
     Amount nTotalLower(0);
-
-    random_shuffle(vCoins.begin(), vCoins.end(), GetRandInt);
-
+         
+    std::shuffle(vCoins.begin(), vCoins.end(), randomNumbers);    
+    
     for (const COutput &output : vCoins) {
         if (!output.fSpendable) {
             continue;
@@ -3038,17 +3018,12 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         CTxMemPoolEntry entry(wtxNew.tx, Amount(0), 0, 0, 0, Amount(0), false,
                               0, lp);
         CTxMemPool::setEntries setAncestors;
-        size_t nLimitAncestors =
-            gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
-        size_t nLimitAncestorSize =
-            gArgs.GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT) *
-            1000;
-        size_t nLimitDescendants =
-            gArgs.GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT);
-        size_t nLimitDescendantSize =
-            gArgs.GetArg("-limitdescendantsize",
-                         DEFAULT_DESCENDANT_SIZE_LIMIT) *
-            1000;
+        size_t nLimitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
+        size_t nLimitAncestorSize = GlobalConfig::GetConfig().GetLimitAncestorSize();
+
+        size_t nLimitDescendants = GlobalConfig::GetConfig().GetLimitDescendantCount();
+        size_t nLimitDescendantSize = GlobalConfig::GetConfig().GetLimitDescendantSize();
+
         std::string errString;
         if (!mempool.CalculateMemPoolAncestors(
                 entry, setAncestors, nLimitAncestors, nLimitAncestorSize,

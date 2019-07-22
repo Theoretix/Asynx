@@ -1,6 +1,6 @@
 // Copyright (c) 2015 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "checkqueue.h"
 #include "bench.h"
@@ -19,7 +19,7 @@ static const int MIN_CORES = 2;
 static const size_t BATCHES = 101;
 static const size_t BATCH_SIZE = 30;
 static const int PREVECTOR_SIZE = 28;
-static const int QUEUE_BATCH_SIZE = 128;
+static const unsigned int QUEUE_BATCH_SIZE = 128;
 static void CCheckQueueSpeed(benchmark::State &state) {
     struct FakeJobNoWork {
         bool operator()() { return true; }

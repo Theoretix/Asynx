@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "protocol.h"
 
@@ -69,7 +69,7 @@ static const std::vector<std::string>
                           allNetMessageTypes + ARRAYLEN(allNetMessageTypes));
 
 CMessageHeader::CMessageHeader(const MessageMagic &pchMessageStartIn) {
-    memcpy(std::begin(pchMessageStart), std::begin(pchMessageStartIn),
+    memcpy(pchMessageStart.data(), pchMessageStartIn.data(),
            MESSAGE_START_SIZE);
     memset(pchCommand, 0, sizeof(pchCommand));
     nMessageSize = -1;
@@ -79,7 +79,7 @@ CMessageHeader::CMessageHeader(const MessageMagic &pchMessageStartIn) {
 CMessageHeader::CMessageHeader(const MessageMagic &pchMessageStartIn,
                                const char *pszCommand,
                                unsigned int nMessageSizeIn) {
-    memcpy(std::begin(pchMessageStart), std::begin(pchMessageStartIn),
+    memcpy(pchMessageStart.data(), pchMessageStartIn.data(),
            MESSAGE_START_SIZE);
     memset(pchCommand, 0, sizeof(pchCommand));
     strncpy(pchCommand, pszCommand, COMMAND_SIZE);
@@ -96,7 +96,7 @@ static bool
 CheckHeaderMagicAndCommand(const CMessageHeader &header,
                            const CMessageHeader::MessageMagic &magic) {
     // Check start string
-    if (memcmp(std::begin(header.pchMessageStart), std::begin(magic),
+    if (memcmp(header.pchMessageStart.data(), magic.data(),
                CMessageHeader::MESSAGE_START_SIZE) != 0) {
         return false;
     }
@@ -169,8 +169,8 @@ bool CMessageHeader::IsOversized(const Config &config) const {
         return true;
     }
 
-    // Scale the maximum accepted size with the block size.
-    if (nMessageSize > 2 * config.GetMaxBlockSize()) {
+    // maximum accepted size with the block size.
+    if (nMessageSize > config.GetMaxBlockSize()) {
         return true;
     }
 

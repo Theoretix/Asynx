@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_TXMEMPOOL_H
 #define BITCOIN_TXMEMPOOL_H
@@ -597,6 +597,7 @@ public:
     // lock free
     void _clear();
     bool CompareDepthAndScore(const uint256 &hasha, const uint256 &hashb);
+    bool CompareDepthAndScoreUnlocked(const uint256 &hasha, const uint256 &hashb);
     void queryHashes(std::vector<uint256> &vtxid);
     bool isSpent(const COutPoint &outpoint);
     unsigned int GetTransactionsUpdated() const;

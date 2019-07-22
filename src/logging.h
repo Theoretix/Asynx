@@ -1,8 +1,8 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2017-2018 The Bitcoin developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_LOGGING_H
 #define BITCOIN_LOGGING_H
@@ -12,6 +12,8 @@
 #include <list>
 #include <mutex>
 #include <string>
+
+#include "tinyformat.h"
 
 static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS = false;
@@ -42,8 +44,9 @@ enum LogFlags : uint32_t {
     MEMPOOLREJ = (1 << 16),
     LIBEVENT = (1 << 17),
     COINDB = (1 << 18),
-    QT = (1 << 19),
     LEVELDB = (1 << 20),
+    TXNPROP = (1 << 21),
+    TXNSRC = (1 << 22),
     ALL = ~uint32_t(0),
 };
 
@@ -63,7 +66,7 @@ private:
      * Log categories bitfield. Leveldb/libevent need special handling if their
      * flags are changed at runtime.
      */
-    std::atomic<uint32_t> logCategories{0};
+    std::atomic<typename std::underlying_type<LogFlags>::type> logCategories{0};
 
     std::string LogTimestampStr(const std::string &str);
 
@@ -88,7 +91,7 @@ public:
     void DisableCategory(LogFlags category);
 
     /** Return true if log accepts specified category */
-    bool WillLogCategory(LogFlags category) const;
+    bool WillLogCategory(typename std::underlying_type<LogFlags>::type category) const;
 
     /** Default for whether ShrinkDebugFile should be run */
     bool DefaultShrinkDebugFile() const;
@@ -98,9 +101,9 @@ public:
 
 BCLog::Logger &GetLogger();
 
-/** Return true if log accepts specified category */
-static inline bool LogAcceptCategory(BCLog::LogFlags category) {
-    return GetLogger().WillLogCategory(category);
+/** Return true if log accepts one of the specified categories */
+static inline bool LogAcceptCategory(typename std::underlying_type<BCLog::LogFlags>::type categories) {
+    return GetLogger().WillLogCategory(categories);
 }
 
 /** Returns a string with the supported log categories */

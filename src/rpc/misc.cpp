@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "rpc/misc.h"
 #include "base58.h"
@@ -22,6 +22,8 @@
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
+#include "vmtouch.h"
+
 #endif
 
 #include <univalue.h>
@@ -121,6 +123,9 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
     obj.push_back(Pair("testnet",
                        config.GetChainParams().NetworkIDString() ==
                            CBaseChainParams::TESTNET));
+    obj.push_back(Pair("stn",
+                       config.GetChainParams().NetworkIDString() ==
+                       CBaseChainParams::STN));
 #ifdef ENABLE_WALLET
     if (pwallet) {
         obj.push_back(Pair("keypoololdest", pwallet->GetOldestKeyPoolTime()));
@@ -135,7 +140,7 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
                        ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
     obj.push_back(Pair("errors", GetWarnings("statusbar")));
     obj.push_back(Pair("maxblocksize", config.GetMaxBlockSize()));
-    obj.push_back(Pair("maxminedblocksize", gArgs.GetArg("-blockmaxsize", DEFAULT_MAX_GENERATED_BLOCK_SIZE)));
+    obj.push_back(Pair("maxminedblocksize", config.GetMaxGeneratedBlockSize()));
     return obj;
 }
 
@@ -585,6 +590,23 @@ static UniValue RPCLockedMemoryInfo() {
     return obj;
 }
 
+static UniValue TouchedPagesInfo() {
+    UniValue obj(UniValue::VOBJ);
+    double percents = 0.0;
+#ifndef WIN32
+    VMTouch vm;
+    try {
+        auto path = GetDataDir() / "chainstate";
+        std::string result = boost::filesystem::canonical(path).string();
+        percents = vm.vmtouch_check(result);
+    }   catch(const std::runtime_error& ex) {
+        LogPrintf("Error while preloading chain state: %s\n", ex.what());
+    }
+#endif
+    obj.push_back(Pair("chainStateCached", percents));
+    return obj;
+}
+
 static UniValue getmemoryinfo(const Config &config,
                               const JSONRPCRequest &request) {
     /* Please, avoid using the word "pool" here in the RPC interface or help,
@@ -618,6 +640,7 @@ static UniValue getmemoryinfo(const Config &config,
 
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("locked", RPCLockedMemoryInfo()));
+    obj.push_back(Pair("preloading", TouchedPagesInfo()));
     return obj;
 }
 
@@ -629,7 +652,7 @@ static UniValue echo(const Config &config, const JSONRPCRequest &request) {
             "testing.\n"
             "\nThe difference between echo and echojson is that echojson has "
             "argument conversion enabled in the client-side table in"
-            "bitcoin-cli and the GUI. There is no server-side difference.");
+            "bitcoin-cli. There is no server-side difference.");
     }
 
     return request.params;

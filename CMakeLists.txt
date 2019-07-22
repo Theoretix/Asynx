@@ -1,9 +1,11 @@
-# Copyright (c) 2018 The Asynx developers
+# Copyright (c) 2017 The Bitcoin developers
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 cmake_minimum_required(VERSION 3.5)
-project(Asynx)
+project(BitcoinSV)
 
-# Add path for custom modules
+# Add path for custom modules.
 set(CMAKE_MODULE_PATH
 	${CMAKE_MODULE_PATH}
 	${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules
@@ -16,7 +18,7 @@ if(CCACHE)
 	set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${CCACHE})
 endif(CCACHE)
 
-# Add the magic taret check and check-all
+# Add the magic target check and check-all.
 add_custom_target(check-all)
 add_custom_target(check)
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2014 BitPay Inc.
 # Copyright 2016-2017 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Test framework for bitcoin utils.
 
 Runs automatically during `make check`.
@@ -38,7 +38,7 @@ def main():
     # Add the format/level to the logger
     logging.basicConfig(format=formatter, level=level)
 
-    bctester(config["environment"]["SRCDIR"] + "/test/util/data",
+    bctester(os.path.join(config["environment"]["SRCDIR"], "test", "util", "data"),
              "bitcoin-util-test.json", config["environment"])
 
 

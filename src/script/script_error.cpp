@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "script_error.h"
 
@@ -43,6 +43,10 @@ const char *ScriptErrorString(const ScriptError serror) {
             return "The requested encoding is impossible to satisfy";
         case SCRIPT_ERR_INVALID_SPLIT_RANGE:
             return "Invalid OP_SPLIT range";
+        case SCRIPT_ERR_SCRIPTNUM_OVERFLOW:
+            return "Script number overflow";
+        case SCRIPT_ERR_SCRIPTNUM_MINENCODE:
+            return "Non-minimally encoded script number";
         case SCRIPT_ERR_BAD_OPCODE:
             return "Opcode missing or not understood";
         case SCRIPT_ERR_DISABLED_OPCODE:

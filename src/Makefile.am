@@ -1,7 +1,6 @@
 # Copyright (c) 2013-2016 The Bitcoin Core developers
-# Copyright (c) 2018 The Bitcoin SV developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2018-2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 DIST_SUBDIRS = secp256k1 univalue
 
@@ -33,7 +32,6 @@ LIBBITCOIN_CONSENSUS=libbitcoin_consensus.a
 LIBBITCOIN_CLI=libbitcoin_cli.a
 LIBBITCOIN_UTIL=libbitcoin_util.a
 LIBBITCOIN_CRYPTO=crypto/libbitcoin_crypto.a
-LIBBITCOINQT=qt/libbitcoinqt.a
 LIBSECP256K1=secp256k1/libsecp256k1.la
 
 if ENABLE_ZMQ
@@ -81,7 +79,7 @@ if BUILD_BITCOIN_SEEDER
 endif
 
 if BUILD_BITCOIN_UTILS
-  bin_PROGRAMS += bitcoin-cli bitcoin-tx
+  bin_PROGRAMS += bitcoin-cli bitcoin-tx bitcoin-miner
 endif
 
 .PHONY: FORCE check-symbols check-security
@@ -92,8 +90,7 @@ BITCOIN_CORE_H = \
   base58.h \
   bloom.h \
   blockencodings.h \
-  cashaddr.h \
-  cashaddrenc.h \
+  blockfileinfostore.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -125,7 +122,11 @@ BITCOIN_CORE_H = \
   logging.h \
   memusage.h \
   merkleblock.h \
-  miner.h \
+  mining/assembler.h \
+  mining/candidates.h \
+  mining/factory.h \
+  mining/legacy.h \
+  mod_pri_queue.h \
   net.h \
   net_processing.h \
   netaddress.h \
@@ -159,12 +160,18 @@ BITCOIN_CORE_H = \
   support/events.h \
   support/lockedpool.h \
   sync.h \
+  task.h \
+  task_helpers.h \
+  threadpool.h \
+  threadpoolT.h \
   threadsafety.h \
   threadinterrupt.h \
   timedata.h \
   torcontrol.h \
   txdb.h \
   txmempool.h \
+  txn_propagator.h \
+  txn_sending_details.h \
   ui_interface.h \
   undo.h \
   util.h \
@@ -173,6 +180,7 @@ BITCOIN_CORE_H = \
   validation.h \
   validationinterface.h \
   versionbits.h \
+  vmtouch.h \
   wallet/coincontrol.h \
   wallet/crypter.h \
   wallet/db.h \
@@ -194,7 +202,7 @@ obj/build.h: FORCE
 	  "$(abs_top_srcdir)"
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
-# server: shared between bitcoind and bitcoin-qt
+# server:
 libbitcoin_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
@@ -202,6 +210,7 @@ libbitcoin_server_a_SOURCES = \
   addrdb.cpp \
   bloom.cpp \
   blockencodings.cpp \
+  blockfileinfostore.cpp \
   chain.cpp \
   checkpoints.cpp \
   config.cpp \
@@ -210,7 +219,9 @@ libbitcoin_server_a_SOURCES = \
   init.cpp \
   dbwrapper.cpp \
   merkleblock.cpp \
-  miner.cpp \
+  mining/candidates.cpp \
+  mining/factory.cpp \
+  mining/legacy.cpp \
   net.cpp \
   net_processing.cpp \
   noui.cpp \
@@ -221,6 +232,7 @@ libbitcoin_server_a_SOURCES = \
   rpc/abc.cpp \
   rpc/blockchain.cpp \
   rpc/mining.cpp \
+  rpc/mining-fbb.cpp \
   rpc/misc.cpp \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
@@ -232,10 +244,12 @@ libbitcoin_server_a_SOURCES = \
   torcontrol.cpp \
   txdb.cpp \
   txmempool.cpp \
+  txn_propagator.cpp \
   ui_interface.cpp \
   validation.cpp \
   validationinterface.cpp \
   versionbits.cpp \
+  vmtouch.cpp \
   $(BITCOIN_CORE_H)
 
 if ENABLE_ZMQ
@@ -248,8 +262,7 @@ libbitcoin_zmq_a_SOURCES = \
 endif
 
 
-# wallet: shared between bitcoind and bitcoin-qt, but only linked
-# when wallet enabled
+# wallet: only linked when wallet enabled
 libbitcoin_wallet_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_wallet_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_wallet_a_SOURCES = \
@@ -325,14 +338,12 @@ libbitcoin_consensus_a_SOURCES = \
   utilstrencodings.h \
   version.h
 
-# common: shared between bitcoind, and bitcoin-qt and non-server tools
+# common: shared between bitcoind and non-server tools
 libbitcoin_common_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_common_a_SOURCES = \
   amount.cpp \
   base58.cpp \
-  cashaddr.cpp \
-  cashaddrenc.cpp \
   chainparams.cpp \
   config.cpp \
   coins.cpp \
@@ -380,9 +391,10 @@ libbitcoin_util_a_SOURCES = \
 
 if GLIBC_BACK_COMPAT
 libbitcoin_util_a_SOURCES += compat/glibc_compat.cpp
+AM_LDFLAGS += $(COMPAT_LDFLAGS)
 endif
 
-# cli: shared between bitcoin-cli and bitcoin-qt
+# cli:
 libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
@@ -487,6 +499,30 @@ bitcoin_tx_LDADD = \
 bitcoin_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
 #
 
+# bitcoin-miner binary #
+bitcoin_miner_SOURCES = bitcoin-miner.cpp \
+arith_uint256.cpp \
+arith_uint256.h \
+uint256.cpp \
+uint256.h \
+crypto/sha512.cpp \
+crypto/sha512.h \
+crypto/chacha20.cpp \
+crypto/chacha20.h
+ 
+bitcoin_miner_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CFLAGS)
+bitcoin_miner_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+bitcoin_miner_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+ 
+bitcoin_miner_LDADD = \
+  $(LIBBITCOIN_CLI) \
+  $(LIBBITCOIN_CRYPTO) \
+  $(LIBUNIVALUE) \
+  $(LIBBITCOIN_UTIL)
+ 
+bitcoin_miner_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
+#
+
 # bitcoinconsensus library #
 if BUILD_BITCOIN_LIBS
 include_HEADERS = script/bitcoinconsensus.h
@@ -518,7 +554,9 @@ CLEANFILES += consensus/*.gcda consensus/*.gcno
 CLEANFILES += crypto/*.gcda crypto/*.gcno
 CLEANFILES += policy/*.gcda policy/*.gcno
 CLEANFILES += primitives/*.gcda primitives/*.gcno
+CLEANFILES += rpc/*.gcda rpc/*.gcno
 CLEANFILES += script/*.gcda script/*.gcno
+CLEANFILES += seeder/*.gcda seeder/*.gcno
 CLEANFILES += support/*.gcda support/*.gcno
 CLEANFILES += univalue/*.gcda univalue/*.gcno
 CLEANFILES += wallet/*.gcda wallet/*.gcno
@@ -542,7 +580,7 @@ clean-local:
 
 .mm.o:
 	$(AM_V_CXX) $(OBJCXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-	  $(CPPFLAGS) $(AM_CXXFLAGS) $(QT_INCLUDES) $(AM_CXXFLAGS) $(PIE_FLAGS) $(CXXFLAGS) -c -o $@ $<
+	  $(CPPFLAGS) $(AM_CXXFLAGS) $(AM_CXXFLAGS) $(PIE_FLAGS) $(CXXFLAGS) -c -o $@ $<
 
 check-symbols: $(bin_PROGRAMS)
 if GLIBC_BACK_COMPAT
@@ -570,12 +608,4 @@ endif
 
 if ENABLE_BENCH
 include Makefile.bench.include
-endif
-
-if ENABLE_QT
-include Makefile.qt.include
-endif
-
-if ENABLE_QT_TESTS
-include Makefile.qttest.include
 endif

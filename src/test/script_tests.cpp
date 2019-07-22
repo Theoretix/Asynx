@@ -1,6 +1,6 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "data/script_tests.json.h"
 
@@ -56,6 +56,8 @@ static ScriptErrorDesc script_errors[] = {
     {SCRIPT_ERR_INVALID_OPERAND_SIZE, "OPERAND_SIZE"},
     {SCRIPT_ERR_INVALID_NUMBER_RANGE, "INVALID_NUMBER_RANGE"},
     {SCRIPT_ERR_INVALID_SPLIT_RANGE, "SPLIT_RANGE"},
+    {SCRIPT_ERR_SCRIPTNUM_OVERFLOW, "SCRIPTNUM_OVERFLOW"},
+    {SCRIPT_ERR_SCRIPTNUM_MINENCODE, "SCRIPTNUM_MINENCODE"},
     {SCRIPT_ERR_VERIFY, "VERIFY"},
     {SCRIPT_ERR_EQUALVERIFY, "EQUALVERIFY"},
     {SCRIPT_ERR_CHECKMULTISIGVERIFY, "CHECKMULTISIGVERIFY"},
@@ -1086,27 +1088,6 @@ BOOST_AUTO_TEST_CASE(script_build) {
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT)
             .ScriptError(SCRIPT_ERR_ILLEGAL_FORKID));
 
-    // Test replay protection
-    tests.push_back(
-        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                    "P2PK REPLAY PROTECTED",
-                    SCRIPT_ENABLE_SIGHASH_FORKID |
-                        SCRIPT_ENABLE_REPLAY_PROTECTION,
-                    false, TEST_AMOUNT)
-            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT,
-                     SCRIPT_ENABLE_SIGHASH_FORKID |
-                         SCRIPT_ENABLE_REPLAY_PROTECTION));
-
-    tests.push_back(
-        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                    "P2PK REPLAY PROTECTED",
-                    SCRIPT_ENABLE_SIGHASH_FORKID |
-                        SCRIPT_ENABLE_REPLAY_PROTECTION,
-                    false, TEST_AMOUNT)
-            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT,
-                     SCRIPT_ENABLE_SIGHASH_FORKID)
-            .ScriptError(SCRIPT_ERR_EVAL_FALSE));
-
     std::set<std::string> tests_set;
 
     {
@@ -1170,13 +1151,16 @@ BOOST_AUTO_TEST_CASE(script_json_test) {
             continue;
         }
 
-        std::string scriptSigString = test[pos++].get_str();
-        std::string scriptPubKeyString = test[pos++].get_str();
+        const std::string scriptSigString = test[pos++].get_str();
+        const std::string scriptPubKeyString = test[pos++].get_str();
+        const std::string scriptFlagsString = test[pos++].get_str();
+        const std::string scriptErrorString = test[pos++].get_str();
+
         try {
             CScript scriptSig = ParseScript(scriptSigString);
             CScript scriptPubKey = ParseScript(scriptPubKeyString);
-            unsigned int scriptflags = ParseScriptFlags(test[pos++].get_str());
-            int scriptError = ParseScriptError(test[pos++].get_str());
+            unsigned int scriptflags = ParseScriptFlags(scriptFlagsString);
+            int scriptError = ParseScriptError(scriptErrorString);
 
             DoTest(scriptPubKey, scriptSig, scriptflags, strTest, scriptError,
                    nValue);

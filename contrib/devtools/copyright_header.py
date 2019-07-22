@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2016 The Bitcoin Core developers
 # Copyright (c) 2017 The Bitcoin developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 import re
 import fnmatch
@@ -27,7 +27,6 @@ EXCLUDE = [
     'src/secp256k1/src/java/org_bitcoin_Secp256k1Context.h',
     # auto generated:
     'src/univalue/lib/univalue_escapes.h',
-    'src/qt/bitcoinstrings.cpp',
     'src/chainparamsseeds.h',
     # other external copyrights:
     'src/tinyformat.h',

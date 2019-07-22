@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "rpc/client.h"
 #include "rpc/server.h"
@@ -24,6 +24,7 @@ UniValue CallRPC(std::string args) {
     std::string strMethod = vArgs[0];
     vArgs.erase(vArgs.begin());
     GlobalConfig config;
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     JSONRPCRequest request;
     request.strMethod = strMethod;
     request.params = RPCConvertValues(strMethod, vArgs);
@@ -46,8 +47,8 @@ BOOST_AUTO_TEST_CASE(rpc_getinfo)
     BOOST_CHECK_NO_THROW(
         r = CallRPC("getinfo");
     );
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxblocksize").get_int(), DEFAULT_MAX_BLOCK_SIZE);
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxminedblocksize").get_int(), DEFAULT_MAX_GENERATED_BLOCK_SIZE);
+    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxblocksize").get_int(), Params().GetDefaultBlockSizeParams().maxBlockSizeAfter);
+    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxminedblocksize").get_int(), Params().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter);
 }
 
 BOOST_AUTO_TEST_CASE(rpc_rawparams) {
@@ -389,7 +390,7 @@ BOOST_AUTO_TEST_CASE(json_parse_errors) {
     // Invalid, trailing garbage
     BOOST_CHECK_THROW(ParseNonRFCJSONValue("1.0sds"), std::runtime_error);
     BOOST_CHECK_THROW(ParseNonRFCJSONValue("1.0]"), std::runtime_error);
-    // BCH addresses should fail parsing
+    // BSV addresses should fail parsing
     BOOST_CHECK_THROW(
         ParseNonRFCJSONValue("175tWpb8K1S7NmH4Zx6rewF9WQrcZv245W"),
         std::runtime_error);

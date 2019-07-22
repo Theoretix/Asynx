@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Base class for RPC testing."""
 
 from collections import deque
@@ -15,6 +15,8 @@ import sys
 import tempfile
 import time
 import traceback
+from test_framework.comptool import TestManager, TestInstance, RejectResult
+from test_framework.mininode import NetworkThread
 
 from .authproxy import JSONRPCException
 from . import coverage
@@ -34,6 +36,7 @@ from .util import (
     sync_mempools,
 )
 
+from test_framework.blocktools import *
 
 class TestStatus(Enum):
     PASSED = 1
@@ -98,13 +101,14 @@ class BitcoinTestFramework():
                           help="Location of the test framework config file")
         parser.add_option("--pdbonfailure", dest="pdbonfailure", default=False, action="store_true",
                           help="Attach a python debugger if test fails")
+        parser.add_option("--waitforpid", dest="waitforpid", default=False, action="store_true",
+                          help="Display the bitcoind pid and wait for the user before proceeding. Useful for (eg) attaching a debugger to bitcoind.")
         self.add_options(parser)
         (self.options, self.args) = parser.parse_args()
 
         PortSeed.n = self.options.port_seed
 
-        os.environ['PATH'] = self.options.srcdir + ":" + \
-            self.options.srcdir + "/qt:" + os.environ['PATH']
+        os.environ['PATH'] = self.options.srcdir + os.pathsep + os.environ['PATH']
 
         check_json_precision()
 
@@ -152,17 +156,18 @@ class BitcoinTestFramework():
                 "Note: bitcoinds were not stopped and may still be running")
 
         if not self.options.nocleanup and not self.options.noshutdown and success != TestStatus.FAILED:
-            self.log.info("Cleaning up")
-            shutil.rmtree(self.options.tmpdir)
+            self.log.info("Cleaning up {} on exit".format(self.options.tmpdir))
+            cleanup_tree_on_exit = True
         else:
             self.log.warning("Not cleaning up dir %s" % self.options.tmpdir)
+            cleanup_tree_on_exit = False
             if os.getenv("PYTHON_DEBUG", ""):
                 # Dump the end of the debug logs, to aid in debugging rare
                 # travis failures.
                 import glob
-                filenames = [self.options.tmpdir + "/test_framework.log"]
-                filenames += glob.glob(self.options.tmpdir +
-                                       "/node*/regtest/debug.log")
+                filenames = [os.path.join(self.options.tmpdir, "test_framework.log")]
+                filenames += glob.glob(os.path.join(self.options.tmpdir,
+                                       "node*", "regtest", "bitcoind.log"))
                 MAX_LINES_TO_PRINT = 1000
                 for fn in filenames:
                     try:
@@ -172,18 +177,22 @@ class BitcoinTestFramework():
                     except OSError:
                         print("Opening file %s failed." % fn)
                         traceback.print_exc()
+            
 
         if success == TestStatus.PASSED:
             self.log.info("Tests successful")
-            sys.exit(TEST_EXIT_PASSED)
+            exit_code = TEST_EXIT_PASSED
         elif success == TestStatus.SKIPPED:
             self.log.info("Test skipped")
-            sys.exit(TEST_EXIT_SKIPPED)
+            exit_code = TEST_EXIT_SKIPPED
         else:
-            self.log.error(
-                "Test failed. Test logging available at %s/test_framework.log", self.options.tmpdir)
-            logging.shutdown()
-            sys.exit(TEST_EXIT_FAILED)
+            self.log.error("Test failed. Test logging available at %s/test_framework.log", self.options.tmpdir)
+            self.log.error("Hint: Call {} '{}' to consolidate all logs".format(os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../combine_logs.py"), self.options.tmpdir))
+            exit_code = TEST_EXIT_FAILED
+        logging.shutdown()
+        if cleanup_tree_on_exit:
+            shutil.rmtree(self.options.tmpdir)
+        sys.exit(exit_code)
 
     # Methods to override in subclass test scripts.
     def set_test_params(self):
@@ -227,18 +236,18 @@ class BitcoinTestFramework():
 
     # Public helper methods. These can be accessed by the subclass test scripts.
 
-    def add_nodes(self, num_nodes, extra_args=None, rpchost=None, timewait=None, binary=None):
+    def add_nodes(self, num_nodes, extra_args=None, rpchost=None, timewait=None, binaries=None):
         """Instantiate TestNode objects"""
 
         if extra_args is None:
             extra_args = [[]] * num_nodes
-        if binary is None:
-            binary = [None] * num_nodes
+        if binaries is None:
+            binaries = [None] * num_nodes
         assert_equal(len(extra_args), num_nodes)
-        assert_equal(len(binary), num_nodes)
+        assert_equal(len(binaries), num_nodes)
         for i in range(num_nodes):
             self.nodes.append(TestNode(i, self.options.tmpdir, extra_args[i], rpchost, timewait=timewait,
-                                       binary=binary[i], stderr=None, mocktime=self.mocktime, coverage_dir=self.options.coveragedir))
+                                       binary=binaries[i], stderr=None, mocktime=self.mocktime, coverage_dir=self.options.coveragedir))
 
     def start_node(self, i, extra_args=None, stderr=None):
         """Start a bitcoind"""
@@ -260,8 +269,12 @@ class BitcoinTestFramework():
         try:
             for i, node in enumerate(self.nodes):
                 node.start(extra_args[i])
-            for node in self.nodes:
+            for i, node in enumerate(self.nodes):
                 node.wait_for_rpc_connection()
+                if(self.options.waitforpid):
+                    print('Node {} started, pid is {}'.format(i, node.process.pid))
+                    print('Do what you need (eg; gdb ./bitcoind {}) and then press <return> to continue...'.format(node.process.pid))
+                    input()
         except:
             # If one node failed to start, stop the others
             self.stop_nodes()
@@ -327,13 +340,13 @@ class BitcoinTestFramework():
         connect_nodes_bi(self.nodes, 1, 2)
         self.sync_all()
 
-    def sync_all(self, node_groups=None):
+    def sync_all(self, node_groups=None, timeout=60):
         if not node_groups:
             node_groups = [self.nodes]
 
         for group in node_groups:
-            sync_blocks(group)
-            sync_mempools(group)
+            sync_blocks(group, timeout=timeout)
+            sync_mempools(group, timeout=timeout)
 
     def enable_mocktime(self, mocktime):
         """Enable mocktime for the script.
@@ -367,7 +380,7 @@ class BitcoinTestFramework():
         ll = int(self.options.loglevel) if self.options.loglevel.isdigit(
         ) else self.options.loglevel.upper()
         ch.setLevel(ll)
-        # Format logs the same as bitcoind's debug.log with microprecision (so log files can be concatenated and sorted)
+        # Format logs the same as bitcoind's bitcoind.log with microprecision (so log files can be concatenated and sorted)
         formatter = logging.Formatter(
             fmt='%(asctime)s.%(msecs)03d000 %(name)s (%(levelname)s): %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         formatter.converter = time.gmtime
@@ -444,7 +457,7 @@ class BitcoinTestFramework():
             self.nodes = []
             self.disable_mocktime()
             for i in range(MAX_NODES):
-                os.remove(log_filename(self.options.cachedir, i, "debug.log"))
+                os.remove(log_filename(self.options.cachedir, i, "bitcoind.log"))
                 os.remove(log_filename(self.options.cachedir, i, "db.log"))
                 os.remove(log_filename(self.options.cachedir, i, "peers.dat"))
                 os.remove(log_filename(
@@ -474,26 +487,62 @@ class ComparisonTestFramework(BitcoinTestFramework):
     - 2 binaries: 1 test binary, 1 ref binary
     - n>2 binaries: 1 test binary, n-1 ref binaries"""
 
+    def __init__(self):
+        super(ComparisonTestFramework,self).__init__()
+        self.chain = ChainManager()
+        self._network_thread = None
+        if not hasattr(self, "testbinary"):
+            self.testbinary = [os.getenv("BITCOIND", "bitcoind")]
+        if not hasattr(self, "refbinary"):
+            self.refbinary = [os.getenv("BITCOIND", "bitcoind")]
+
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
 
     def add_options(self, parser):
-        parser.add_option("--testbinary", dest="testbinary",
-                          default=os.getenv("BITCOIND", "bitcoind"),
-                          help="bitcoind binary to test")
-        parser.add_option("--refbinary", dest="refbinary",
-                          default=os.getenv("BITCOIND", "bitcoind"),
-                          help="bitcoind binary to use for reference nodes (if any)")
+        parser.add_option("--testbinary", dest="testbinary", help="bitcoind binary to test")
+        parser.add_option("--refbinary", dest="refbinary", help="bitcoind binary to use for reference nodes (if any)")
 
     def setup_network(self):
         extra_args = [['-whitelist=127.0.0.1']] * self.num_nodes
         if hasattr(self, "extra_args"):
             extra_args = self.extra_args
-        self.add_nodes(self.num_nodes, extra_args,
-                       binary=[self.options.testbinary] +
-                       [self.options.refbinary] * (self.num_nodes - 1))
+        if self.options.testbinary:
+            self.testbinary = [self.options.testbinary]
+        if self.options.refbinary:
+            self.refbinary = [self.options.refbinary]
+        binaries = [self.testbinary] + [self.refbinary] * (self.num_nodes - 1)
+        self.add_nodes(self.num_nodes, extra_args, binaries=binaries)
         self.start_nodes()
+        self.init_network()
+
+    def restart_network(self, timeout=None):
+        self.test.clear_all_connections()
+        # If we had a network thread from eariler, make sure it's finished before reconnecting
+        if self._network_thread is not None:
+            self._network_thread.join(timeout)
+        # Reconnect
+        self.test.add_all_connections(self.nodes)
+        self._network_thread = NetworkThread()
+        self._network_thread.start()
+
+    def init_network(self):
+        # Start creating test manager which help to manage test cases
+        self.test = TestManager(self, self.options.tmpdir)
+        # (Re)start network
+        self.restart_network()
+
+    # returns a test case that asserts that the current tip was accepted
+    def accepted(self):
+        return TestInstance([[self.chain.tip, True]])
+
+    # returns a test case that asserts that the current tip was rejected
+    def rejected(self, reject=None):
+        if reject is None:
+            return TestInstance([[self.chain.tip, False]])
+        else:
+            return TestInstance([[self.chain.tip, reject]])
 
 
 class SkipTest(Exception):

@@ -1,4 +1,6 @@
-# Copyright (c) 2018 The Asynx developers
+# Copyright (c) 2017 The Bitcoin developers
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 # This generates config.h which provides numerous defines
 # about the state of the plateform we are building on.
@@ -7,18 +9,23 @@ include(CheckIncludeFiles)
 include(CheckSymbolExists)
 
 # Package informations
-set(PACKAGE_NAME "Asynx")
+set(PACKAGE_NAME "Bitcoin SV")
 
 # Version
 set(CLIENT_VERSION_MAJOR 0)
-set(CLIENT_VERSION_MINOR 1)
-set(CLIENT_VERSION_REVISION 0)
+set(CLIENT_VERSION_MINOR 2)
+set(CLIENT_VERSION_REVISION 1)
 set(CLIENT_VERSION_BUILD 0)
 
-option(CLIENT_VERSION_IS_RELEASE "Build a release version" OFF)
+if(ENABLE_PROD_BUILD)
+    set(CLIENT_VERSION_IS_RELEASE "true")
+else()
+    set(CLIENT_VERSION_IS_RELEASE "false")
+endif()
+
 
 # Copyright
-set(COPYRIGHT_YEAR 2018)
+set(COPYRIGHT_YEAR 2019)
 set(COPYRIGHT_HOLDERS "The %s developers")
 set(COPYRIGHT_HOLDERS_SUBSTITUTION Bitcoin)
 string(REPLACE "%s" ${COPYRIGHT_HOLDERS_SUBSTITUTION} COPYRIGHT_HOLDERS_FINAL ${COPYRIGHT_HOLDERS})
@@ -83,7 +90,7 @@ function(check_builtin_exist SYMBOL VARIABLE)
 		if(NOT CMAKE_REQUIRED_QUIET)
 			message(STATUS "Looking for ${SYMBOL} - found")
 		endif()
-		set(${VARIABLE} 1 CACHE INTERNAL "Have symbol ${SYMBOL}" PARENT_SCOPE)
+		set(${VARIABLE} 1 CACHE INTERNAL "Have symbol ${SYMBOL}")
 		file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log
 			"Determining if the ${SYMBOL} "
 			"exist passed with the following output:\n"
@@ -93,7 +100,7 @@ function(check_builtin_exist SYMBOL VARIABLE)
 		if(NOT CMAKE_REQUIRED_QUIET)
 			message(STATUS "Looking for ${SYMBOL} - not found")
 		endif()
-		set(${VARIABLE} "" CACHE INTERNAL "Have symbol ${SYMBOL}" PARENT_SCOPE)
+		set(${VARIABLE} "" CACHE INTERNAL "Have symbol ${SYMBOL}")
 		file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log
 			"Determining if the ${SYMBOL} "
 			"exist failed with the following output:\n"

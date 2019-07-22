@@ -1,8 +1,6 @@
 UNIX BUILD NOTES
 ====================
-Some notes on how to build Asynx in Unix.
-
-(for OpenBSD specific instructions, see [build-openbsd.md](build-openbsd.md))
+Some notes on how to build Bitcoin SV in Unix.
 
 Note
 ---------------------
@@ -24,8 +22,6 @@ make
 make install # optional
 ```
 
-This will build bitcoin-qt as well if the dependencies are met.
-
 Dependencies
 ---------------------
 
@@ -43,9 +39,6 @@ Optional dependencies:
  ------------|------------------|----------------------
  miniupnpc   | UPnP Support     | Firewall-jumping support
  libdb       | Berkeley DB      | Wallet storage (only needed when wallet enabled)
- qt          | GUI              | GUI toolkit (only needed when GUI enabled)
- protobuf    | Payments in GUI  | Data interchange format used for payment protocol (only needed when GUI enabled)
- libqrencode | QR codes in GUI  | Optional for generating QR codes (only needed when GUI enabled)
  univalue    | Utility          | JSON parsing and encoding (bundled version will be used unless --with-system-univalue passed to configure)
  libzmq3     | ZMQ notification | Optional, allows generating ZMQ notifications (requires ZMQ version >= 4.x)
 
@@ -55,7 +48,7 @@ Memory Requirements
 --------------------
 
 C++ compilers are memory-hungry. It is recommended to have at least 1.5 GB of
-memory available when compiling Asynx. On systems with less, gcc can be
+memory available when compiling Bitcoin SV. On systems with less, gcc can be
 tuned to conserve memory with additional CXXFLAGS:
 
 
@@ -66,6 +59,18 @@ Dependency Build Instructions: Ubuntu & Debian
 Build requirements:
 
     sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
+
+GCC version:
+
+A sufficiently recent version of GCC that supports C++17 is required for
+building, which in practise means at least version 7.X or above. On recent
+testing versions of Debian & Ubuntu 18.04+ a suitable version should either
+be installed by default or available in the standard package repositories.
+But if you are running an older release you may have to install a newer
+version of GCC from another repository.
+
+For instructions on how to install a more recent version of GCC into an
+older Ubuntu LTS see here: https://gist.github.com/application2000/73fd6f4bf1be6600a2cf9f56315a2d91 
 
 Options when installing required Boost library files:
 
@@ -84,7 +89,7 @@ BerkeleyDB 5.3 or later is required for the wallet. This can be installed with:
         sudo apt-get install libdb-dev
         sudo apt-get install libdb++-dev
 
-See the section "Disable-wallet mode" to build Asynx without wallet.
+See the section "Disable-wallet mode" to build Bitcoin SV without wallet.
 
 Optional (see --with-miniupnpc and --enable-upnp-default):
 
@@ -94,31 +99,8 @@ ZMQ dependencies (provides ZMQ API 4.x):
 
     sudo apt-get install libzmq3-dev
 
-Dependencies for the GUI: Ubuntu & Debian
------------------------------------------
-
-If you want to build Bitcoin-Qt, make sure that the required packages for Qt development
-are installed. Either Qt 5 or Qt 4 are necessary to build the GUI.
-If both Qt 4 and Qt 5 are installed, Qt 5 will be used. Pass `--with-gui=qt4` to configure to choose Qt4.
-To build without GUI pass `--without-gui`.
-
-To build with Qt 5 (recommended) you need the following:
-
-    sudo apt-get install libqt5gui5 libqt5core5a libqt5dbus5 qttools5-dev qttools5-dev-tools libprotobuf-dev protobuf-compiler
-
-Alternatively, to build with Qt 4 you need the following:
-
-    sudo apt-get install libqt4-dev libprotobuf-dev protobuf-compiler
-
-libqrencode (optional) can be installed with:
-
-    sudo apt-get install libqrencode-dev
-
-Once these are installed, they will be found by configure and a bitcoin-qt executable will be
-built by default.
-
-Dependency Build Instructions: Fedora
--------------------------------------
+Dependency Build Instructions: Fedora/Centos
+--------------------------------------------
 Build requirements:
 
     sudo dnf install gcc-c++ libtool make autoconf automake openssl-devel libevent-devel boost-devel libdb-devel libdb-cxx-devel
@@ -127,13 +109,16 @@ Optional:
 
     sudo dnf install miniupnpc-devel
 
-To build with Qt 5 (recommended) you need the following:
+GCC version:
 
-    sudo dnf install qt5-qttools-devel qt5-qtbase-devel protobuf-devel
+A sufficiently recent version of GCC that supports C++17 is required for
+building, which in practise means at least version 7.X or above. On
+Centos 7 this means you will have to install a newer version of GCC from
+the auxilliary devtoolset suite. For exmaple:
 
-libqrencode (optional) can be installed with:
-
-    sudo dnf install qrencode-devel
+    sudo yum install centos-release-scl
+    sudo yum install devtoolset-7-gcc*
+    scl enable devtoolset-7 bash
 
 Notes
 -----
@@ -227,10 +212,10 @@ Setup and Build Example: Arch Linux
 This example lists the steps necessary to setup and build a command line only, non-wallet distribution of the latest changes on Arch Linux:
 
     pacman -S git base-devel boost libevent python
-    git clone https://github.com/Theoretix/Asynx
-    cd asynx/
+    git clone https://github.com/bitcoin-sv/bitcoin-sv
+    cd bitcoin-sv/
     ./autogen.sh
-    ./configure --disable-wallet --without-gui --without-miniupnpc
+    ./configure --disable-wallet --without-miniupnpc
     make check
 
 
@@ -248,7 +233,7 @@ Then, install the toolchain and curl:
 To build executables for ARM:
 
     cd depends
-    make HOST=arm-linux-gnueabihf NO_QT=1
+    make HOST=arm-linux-gnueabihf
     cd ..
     ./configure --prefix=$PWD/depends/arm-linux-gnueabihf --enable-glibc-back-compat --enable-reduce-exports LDFLAGS=-static-libstdc++
     make
@@ -261,8 +246,7 @@ Building on FreeBSD
 
 (Updated as of FreeBSD 11.0)
 
-Clang is installed by default as `cc` compiler, this makes it easier to get
-started than on [OpenBSD](build-openbsd.md). Installing dependencies:
+Clang is installed by default as `cc` compiler. Installing dependencies:
 
     pkg install autoconf automake libtool pkgconf
     pkg install boost-libs openssl libevent gmake
@@ -288,11 +272,11 @@ Then build using:
   
 With wallet support:
 
-    ./configure --without-gui --without-miniupnpc --with-incompatible-bdb BDB_CFLAGS="-I/usr/local/include/db5" BDB_LIBS="-L/usr/local/lib -ldb_cxx-5"
+    ./configure --without-miniupnpc --with-incompatible-bdb BDB_CFLAGS="-I/usr/local/include/db5" BDB_LIBS="-L/usr/local/lib -ldb_cxx-5"
 
 Without wallet support:
 
-    ./configure --without-gui --without-miniupnpc --disable-wallet
+    ./configure --without-miniupnpc --disable-wallet
 
 Then to compile:
 

@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "rpc/server.h"
 
@@ -14,6 +14,7 @@
 #include "protocol.h"
 #include "sync.h"
 #include "timedata.h"
+#include "txn_propagator.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -61,7 +62,7 @@ static UniValue ping(const Config &config, const JSONRPCRequest &request) {
             "Error: Peer-to-peer functionality missing or disabled");
 
     // Request that each node send a ping during next message processing pass
-    g_connman->ForEachNode([](CNode *pnode) { pnode->fPingQueued = true; });
+    g_connman->ForEachNode([](const CNodePtr& pnode) { pnode->fPingQueued = true; });
     return NullUniValue;
 }
 
@@ -110,6 +111,7 @@ static UniValue getpeerinfo(const Config &config,
             "due to addnode and is using an addnode slot\n"
             "    \"startingheight\": n,       (numeric) The starting height "
             "(block) of the peer\n"
+            "    \"txninvsize\": n,           (numeric) The number of queued transaction inventory msgs we have for this peer\n "
             "    \"banscore\": n,             (numeric) The ban score\n"
             "    \"synced_headers\": n,       (numeric) The last header we "
             "have in common with this peer\n"
@@ -185,6 +187,7 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("inbound", stats.fInbound));
         obj.push_back(Pair("addnode", stats.fAddnode));
         obj.push_back(Pair("startingheight", stats.nStartingHeight));
+        obj.push_back(Pair("txninvsize", static_cast<uint64_t>(stats.nInvQueueSize)));
         if (fStateStats) {
             obj.push_back(Pair("banscore", statestats.nMisbehavior));
             obj.push_back(Pair("synced_headers", statestats.nSyncHeight));
@@ -500,8 +503,11 @@ static UniValue getnetworkinfo(const Config &config,
             "transaction relay is requested from peers\n"
             "  \"timeoffset\": xxxxx,                   (numeric) the time "
             "offset\n"
+            "  \"txnpropagationfreq\": xxxxx,           (numeric) how often the transaction propagator runs (milli-secs)\n"
+            "  \"txnpropagationqlen\": xxxxx,           (numeric) length of the transaction propagator queue\n"
             "  \"connections\": xxxxx,                  (numeric) the number "
             "of connections\n"
+            "  \"addresscount\": xxxxx,                 (numeric) number of known peer addresses\n"
             "  \"networkactive\": true|false,           (bool) whether p2p "
             "networking is enabled\n"
             "  \"networks\": [                          (array) information "
@@ -557,10 +563,11 @@ static UniValue getnetworkinfo(const Config &config,
     obj.push_back(Pair("localrelay", fRelayTxes));
     obj.push_back(Pair("timeoffset", GetTimeOffset()));
     if (g_connman) {
+        obj.push_back(Pair("txnpropagationfreq", g_connman->getTransactionPropagator()->getRunFrequency().count()));
+        obj.push_back(Pair("txnpropagationqlen", static_cast<uint64_t>(g_connman->getTransactionPropagator()->getNewTxnQueueLength())));
         obj.push_back(Pair("networkactive", g_connman->GetNetworkActive()));
-        obj.push_back(
-            Pair("connections",
-                 (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL)));
+        obj.push_back(Pair("connections", (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL)));
+        obj.push_back(Pair("addresscount", static_cast<uint64_t>(g_connman->GetAddressCount())));
     }
     obj.push_back(Pair("networks", GetNetworksInfo()));
     obj.push_back(Pair("relayfee",
@@ -744,6 +751,29 @@ static UniValue setnetworkactive(const Config &config,
     return g_connman->GetNetworkActive();
 }
 
+static UniValue settxnpropagationfreq(const Config &config, const JSONRPCRequest &request)
+{
+    if(request.fHelp || request.params.size() != 1)
+    {
+        throw std::runtime_error(
+            "settxnpropagationfreq freq\n"
+            "\nSet the frequency (in milli-seconds) the transaction propagator runs at.\n"
+            "\nArguments:\n"
+            "1. \"freq\"        (numeric, required) the frequency in milliseconds\n");
+    }
+
+    if(!g_connman)
+    {
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED,
+            "Error: Peer-to-peer functionality missing or disabled");
+    }
+
+    std::chrono::milliseconds freq { request.params[0].get_int() };
+    g_connman->getTransactionPropagator()->setRunFrequency(freq);
+
+    return g_connman->getTransactionPropagator()->getRunFrequency().count();
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafeMode
@@ -760,6 +790,7 @@ static const CRPCCommand commands[] = {
     { "network",            "listbanned",             listbanned,             true,  {} },
     { "network",            "clearbanned",            clearbanned,            true,  {} },
     { "network",            "setnetworkactive",       setnetworkactive,       true,  {"state"} },
+    { "network",            "settxnpropagationfreq",  settxnpropagationfreq,  true,  {"freq"} },
 };
 // clang-format on
 

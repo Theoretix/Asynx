@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Helpful routines for regression testing."""
 
 from base64 import b64encode
@@ -329,9 +329,8 @@ def initialize_datadir(dirname, n):
         f.write("port=" + str(p2p_port(n)) + "\n")
         f.write("rpcport=" + str(rpc_port(n)) + "\n")
         f.write("listenonion=0\n")
-        f.write("usecashaddr=1\n")
+        f.write("shrinkdebugfile=0\n")
     return datadir
-
 
 def get_datadir_path(dirname, n):
     return os.path.join(dirname, "node" + str(n))
@@ -399,6 +398,13 @@ def connect_nodes_bi(nodes, a, b):
     connect_nodes(nodes[a], b)
     connect_nodes(nodes[b], a)
 
+def connect_nodes_mesh(nodes, bi=False):
+    for i in range(len(nodes)):
+        for j in range(i + 1, len(nodes)):
+            if bi:
+                connect_nodes_bi(nodes, i, j)
+            else:
+                connect_nodes(nodes[i], j)
 
 def sync_blocks(rpc_connections, *, wait=1, timeout=60):
     """
