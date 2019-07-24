@@ -3,7 +3,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 cmake_minimum_required(VERSION 3.5)
-project(BitcoinSV)
+project(Asynx)
 
 set(CMAKE_CXX_STANDARD 17)
 

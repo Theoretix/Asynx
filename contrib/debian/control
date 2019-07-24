@@ -19,9 +19,9 @@ Build-Depends: debhelper,
  libboost-test-dev (>> 1.35) | libboost-test1.35-dev,
  python
 Standards-Version: 3.9.2
-Homepage: https://bitcoinsv.io/
-Vcs-Git: https://github.com/bitcoin-sv/bitcoin-sv.git
-Vcs-Browser: https://github.com/bitcoin-sv/bitcoin-sv
+Homepage: https://asynx.io/
+Vcs-Git: https://github.com/Theoretix/Asynx.git
+Vcs-Browser: https://github.com/Theoretix/Asynx
 
 Package: bitcoind
 Architecture: any
@@ -30,7 +30,7 @@ Description: peer-to-peer network based digital currency - daemon
  Bitcoin is an experimental new digital currency that enables instant
  payments to anyone, anywhere in the world. Bitcoin uses peer-to-peer
  technology to operate with no central authority: managing transactions
- and issuing money are carried out collectively by the network. Bitcoin SV
+ and issuing money are carried out collectively by the network. Asynx
  is the name of the open source software which enables the use of this currency.
  .
  This package provides the daemon, bitcoind, and the CLI tool
@@ -43,7 +43,7 @@ Description: peer-to-peer digital currency - standalone transaction tool
  Bitcoin is an experimental new digital currency that enables instant
  payments to anyone, anywhere in the world. Bitcoin uses peer-to-peer
  technology to operate with no central authority: managing transactions
- and issuing money are carried out collectively by the network. Bitcoin SV
+ and issuing money are carried out collectively by the network. Asynx
  is the name of the open source software which enables the use of this currency.
  .
  This package provides bitcoin-tx, a command-line transaction creation

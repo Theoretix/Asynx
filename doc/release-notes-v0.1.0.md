@@ -1,4 +1,4 @@
-# Bitcoin SV version 0.1.0 Release Notes
+# Asynx version 0.1.0 Release Notes
 
 This release includes support for the November 2018 Upgrade. When the upgrade activates, the 
 following changes take effect:
@@ -30,6 +30,18 @@ post-upgrade value (128MB) before the November 2018 upgrade has taken place
 * Made the `excessiveblocksize` a standard parameter (was debug)
 * Added `excessiveblocksize` and `maxblocksize` to RPC getinfo
 * Fix for CVE-2018-17144
+* added `broadcastdelay` configuration parameter. Sets the number of milliseconds
+    to wait before relaying transactions. When set, this replaces the random delay.
+* updated DNS seeds to point to Bitcoin SV dedicated seed nodes
+* optimized handling of P2P inventory messages into own threads, increased parallelization of tx propagation
+* increased maxmimum P2P protocol message length
+* set maximum number of items to include in inventory size to be dependent on block size
+* added the Scaling Test Network
+* activate with `stn=1` in bitcoin.conf
+* getinfo returns new field, `stn=true|false`
+* renamed `debug.log` to `bitcoind.log`
+* added capability to log source of transactions  
+* various other fixes
 
 ## List of Tests
 * Unit Tests

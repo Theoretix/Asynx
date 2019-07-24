@@ -1,7 +1,7 @@
 Developer Notes
 ===============
 
-These notes will be updated for Bitcoin SV when the Bitcoin SV team begin
+These notes will be updated for Asynx when the Bitcoin SV team begin
 accepting code contributions.
 
 Various coding styles have been used during the history of the codebase,
