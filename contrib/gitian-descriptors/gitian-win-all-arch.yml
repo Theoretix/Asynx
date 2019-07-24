@@ -1,5 +1,5 @@
 ---
-name: "asynx-0.2.0-linux"
+name: "asynx-0.2.0-win"
 enable_cache: true
 suites:
 - "bionic"
